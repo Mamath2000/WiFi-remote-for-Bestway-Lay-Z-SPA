@@ -20,6 +20,11 @@ function loadNetworkConfig() {
             document.getElementById('ip4DnsPrimary').value      = json.ip4DnsPrimary     || '';
             document.getElementById('ip4DnsSecondary').value    = json.ip4DnsSecondary   || '';
             document.getElementById('ip4NTP').value             = json.ip4NTP            || '';
+
+            // RF tuning. Defaults applied if missing from JSON (older firmware).
+            document.getElementById('txPowerDbm').value = (json.txPowerDbm !== undefined) ? json.txPowerDbm : 20.5;
+            document.getElementById('noModemSleep').checked = (json.noModemSleep !== undefined) ? !!json.noModemSleep : true;
+            document.getElementById('phyMode').value = (json.phyMode !== undefined) ? json.phyMode : 0;
         }
     }
 }
@@ -46,7 +51,10 @@ function saveNetworkConfig() {
     ip4Subnet:        document.getElementById('ip4Subnet').value                        || '255.255.255.0',
     ip4DnsPrimary:    document.getElementById('ip4DnsPrimary').value,
     ip4DnsSecondary:  document.getElementById('ip4DnsSecondary').value,
-    ip4NTP:           document.getElementById('ip4NTP').value
+    ip4NTP:           document.getElementById('ip4NTP').value,
+    txPowerDbm:       parseFloat(document.getElementById('txPowerDbm').value),
+    noModemSleep:     document.getElementById('noModemSleep').checked,
+    phyMode:          parseInt(document.getElementById('phyMode').value, 10)
     };
     req.send(JSON.stringify(json));
     document.getElementById('apPwd').value = '<enter password>';

@@ -149,6 +149,55 @@
 </section>
 
 
+<!-- ==================== SECTION: RF Tuning ==================== -->
+<section>
+  <h2 data-i18n="section_rf_tuning">RF Tuning (range/stability):</h2>
+  <p style="font-size:0.9em">
+    Defaults are tuned for maximum range. Save + reboot ESP to apply.
+  </p>
+  <table>
+    <tr>
+      <td>
+        <label for="txPowerDbm" data-i18n="label_tx_power">TX power (dBm):</label>
+        <span class="tooltip"
+          data-text="Transmit power, 0..20.5 dBm. Higher = more range, more current. Default 20.5 = max."
+          data-i18n="[data-text]tooltip_tx_power">?</span>
+      </td>
+      <td>
+        <input type="number" id="txPowerDbm" min="0" max="20.5" step="0.5" style="width:80px">
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <label for="noModemSleep" data-i18n="label_no_sleep">Disable modem sleep:</label>
+        <span class="tooltip"
+          data-text="Checked = WiFi radio always on (snappier, +1 dB effective margin, ~+30 mA). Unchecked = standard modem sleep."
+          data-i18n="[data-text]tooltip_no_sleep">?</span>
+      </td>
+      <td>
+        <input type="checkbox" id="noModemSleep">
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <label for="phyMode" data-i18n="label_phy_mode">PHY mode:</label>
+        <span class="tooltip"
+          data-text="Auto = let driver choose. 802.11b = most robust on weak signal (+5..+8 dB sensitivity, capped at 11 Mbps but irrelevant here). 802.11g/n = faster, slightly worse edge."
+          data-i18n="[data-text]tooltip_phy_mode">?</span>
+      </td>
+      <td>
+        <select id="phyMode">
+          <option value="0">Auto (default)</option>
+          <option value="1">802.11b only (best range)</option>
+          <option value="2">802.11g</option>
+          <option value="3">802.11n</option>
+        </select>
+      </td>
+    </tr>
+  </table>
+</section>
+
+
 <!-- ==================== BUTTON “SAVE” ==================== -->
 <section>
   <table>

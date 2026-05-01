@@ -340,6 +340,18 @@ void startWiFi()
     WiFi.mode(WIFI_STA); // WiFi.setOutputPower(15.0);
     loadWifi();
 
+    // RF tuning from wifi.json (web-UI editable, no rebuild needed).
+    // Defaults: txPowerDbm=20.5 (max), noModemSleep=true, phyMode=auto.
+    WiFi.setOutputPower(wifi_info->txPowerDbm);
+    WiFi.setSleep(wifi_info->noModemSleep ? WIFI_NONE_SLEEP : WIFI_MODEM_SLEEP);
+    switch (wifi_info->phyMode)
+    {
+        case 1: WiFi.setPhyMode(WIFI_PHY_MODE_11B); break; // most robust on weak links
+        case 2: WiFi.setPhyMode(WIFI_PHY_MODE_11G); break;
+        case 3: WiFi.setPhyMode(WIFI_PHY_MODE_11N); break;
+        default: /* leave default (auto) */ break;
+    }
+
     if (wifi_info->enableStaticIp4)
     {
         BWC_LOG_P(PSTR("Setting static IP\n"), 0);
@@ -1353,6 +1365,12 @@ void loadWifi()
     wifi_info->ip4DnsSecondary_str = doc[F("ip4DnsSecondary")].as<String>();
     wifi_info->ip4NTP_str = doc[F("ip4NTP")].as<String>();
 
+    // RF tuning fields — only override defaults if present, so older
+    // wifi.json files (no RF section yet) keep working with defaults.
+    if (doc.containsKey(F("txPowerDbm")))   wifi_info->txPowerDbm   = doc[F("txPowerDbm")].as<float>();
+    if (doc.containsKey(F("noModemSleep"))) wifi_info->noModemSleep = doc[F("noModemSleep")].as<bool>();
+    if (doc.containsKey(F("phyMode")))      wifi_info->phyMode      = doc[F("phyMode")].as<int>();
+
     BWC_YIELD;
 }
 
@@ -1381,6 +1399,9 @@ void saveWifi()
     doc[F("ip4DnsPrimary")] = wifi_info->ip4DnsPrimary_str;
     doc[F("ip4DnsSecondary")] = wifi_info->ip4DnsSecondary_str;
     doc[F("ip4NTP")] = wifi_info->ip4NTP_str;
+    doc[F("txPowerDbm")]   = wifi_info->txPowerDbm;
+    doc[F("noModemSleep")] = wifi_info->noModemSleep;
+    doc[F("phyMode")]      = wifi_info->phyMode;
 
     if (serializeJson(doc, file) == 0)
     {
@@ -1417,8 +1438,11 @@ void handleGetWifi()
     doc[F("ip4DnsPrimary")] = wifi_info->ip4DnsPrimary_str;
     doc[F("ip4DnsSecondary")] = wifi_info->ip4DnsSecondary_str;
     doc[F("ip4NTP")] = wifi_info->ip4NTP_str;
+    doc[F("txPowerDbm")]   = wifi_info->txPowerDbm;
+    doc[F("noModemSleep")] = wifi_info->noModemSleep;
+    doc[F("phyMode")]      = wifi_info->phyMode;
     String json;
-    json.reserve(200);
+    json.reserve(280);
     if (serializeJson(doc, json) == 0)
     {
         json = F("{\"error\": \"Failed to serialize message\"}");
@@ -1458,6 +1482,9 @@ void handleSetWifi()
     wifi_info->ip4DnsPrimary_str = doc[F("ip4DnsPrimary")].as<String>();
     wifi_info->ip4DnsSecondary_str = doc[F("ip4DnsSecondary")].as<String>();
     wifi_info->ip4NTP_str = doc[F("ip4NTP")].as<String>();
+    if (doc.containsKey(F("txPowerDbm")))   wifi_info->txPowerDbm   = doc[F("txPowerDbm")].as<float>();
+    if (doc.containsKey(F("noModemSleep"))) wifi_info->noModemSleep = doc[F("noModemSleep")].as<bool>();
+    if (doc.containsKey(F("phyMode")))      wifi_info->phyMode      = doc[F("phyMode")].as<int>();
 
     saveWifi();
 
