@@ -100,6 +100,14 @@ void CIO_6_TYPE1::updateStates()
     cio_states.power = (_raw_payload_from_cio[PWR_IDX] & (1 << PWR_BIT)) > 0;
     /*If both leds are out, don't change (When TIMER is pressed)*/
     if(_raw_payload_from_cio[C_IDX] & (1 << C_BIT) || _raw_payload_from_cio[F_IDX] & (1 << F_BIT))
+//defined in platformio.ini to counter occasional bitflips on the unit, making homeassistant graphs look ugly
+#ifdef LOCKTOC
+        cio_states.unit = 1;
+#elif defined LOCKTOF
+        cio_states.unit = 0;
+#else
+        cio_states.unit = (_raw_payload_from_cio[C_IDX] & (1 << C_BIT)) > 0;
+#endif
         cio_states.unit = (_raw_payload_from_cio[C_IDX] & (1 << C_BIT)) > 0;
         cio_states.bubbles = (_raw_payload_from_cio[AIR_IDX] & (1 << AIR_BIT)) > 0;
         cio_states.heatgrn = (_raw_payload_from_cio[GRNHTR_IDX] & (1 << GRNHTR_BIT)) > 0;
