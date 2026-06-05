@@ -108,7 +108,6 @@ void CIO_6_TYPE1::updateStates()
 #else
         cio_states.unit = (_raw_payload_from_cio[C_IDX] & (1 << C_BIT)) > 0;
 #endif
-        cio_states.unit = (_raw_payload_from_cio[C_IDX] & (1 << C_BIT)) > 0;
         cio_states.bubbles = (_raw_payload_from_cio[AIR_IDX] & (1 << AIR_BIT)) > 0;
         cio_states.heatgrn = (_raw_payload_from_cio[GRNHTR_IDX] & (1 << GRNHTR_BIT)) > 0;
         cio_states.heatred = (_raw_payload_from_cio[REDHTR_IDX] & (1 << REDHTR_BIT)) > 0;
