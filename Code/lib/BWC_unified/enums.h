@@ -266,3 +266,49 @@ struct sWifi_info
                                     // 11b is +5..+8 dB more sensitive on the edge but
                                     // capped at 11 Mbps (irrelevant here).
 };
+
+struct sWifi_info_eeprom_t
+{
+    //size of block is 136
+    char tag[4] = {'W', 'I', 'F', 'I'}; // tag to identify valid data
+    uint32_t ip4Address;
+    uint32_t ip4Gateway;
+    uint32_t ip4Subnet;
+    uint32_t ip4DnsPrimary;
+    uint32_t ip4DnsSecondary;
+    uint32_t ip4NTP;
+    int phyMode;
+    float txPowerDbm;
+    char apSsid[32];
+    char apPwd[64];
+    bool enableAp;
+    bool enableWmApFallback;
+    bool enableStaticIp4;
+    bool noModemSleep;
+};
+struct sMQTT_info_eeprom_t
+{
+    //size of block is 176
+    char tag[4] = {'M', 'Q', 'T', 'T'}; // tag to identify valid data
+    char mqttHost[32];
+    int mqttTelemetryInterval;
+    int mqttPort;
+    char mqttUsername[32];
+    char mqttPassword[32];
+    char mqttClientId[32];
+    char mqttBaseTopic[32];
+    bool useMqtt;
+};
+
+struct sHW_config_eeprom_t
+{
+    //size of block is 72
+    Power power_levels;
+    char tag[4] = {'H', 'W', 'C', 'F'}; // tag to identify valid data
+    Models cioNo;
+    Models dspNo;
+    char pcbname[8];
+    int pins[8];
+    bool hasTempSensor;
+    bool power_levels_override;
+};

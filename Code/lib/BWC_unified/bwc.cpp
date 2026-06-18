@@ -1316,56 +1316,93 @@ void BWC::_updateTimes(){
 
 bool BWC::_loadHardware(Models& cioNo, Models& dspNo, int pins[], std::optional<Power>& power_levels)
 {
-    File file = LittleFS.open(F("/hwcfg.json"), "r");
-    if (!file)
+    // File file = LittleFS.open(F("/hwcfg.json"), "r");
+    // if (!file)
+    // {
+    //     // Serial.println(F("Failed to open hwcfg.json"));
+    //     return false;
+    // }
+    // // DynamicJsonDocument doc(256);
+    // StaticJsonDocument<512> doc;
+    // DeserializationError error = deserializeJson(doc, file);
+    // if (error) {
+    //     // Serial.println(F("Failed to read settings.txt"));
+    //     file.close();
+    //     return false;
+    // }
+    // file.close();
+    // cioNo = doc[F("cio")];
+    // dspNo = doc[F("dsp")];
+
+    // if(doc[F("hasTempSensor")].as<int>() == 1)
+    // {
+    //     hasTempSensor = true;
+    // }
+
+    // String pcbname = doc[F("pcb")].as<String>();
+    // // int pins[7];
+    // #ifdef ESP8266
+    // int DtoGPIO[] = {D0, D1, D2, D3, D4, D5, D6, D7, D8};
+    // #endif
+    // for(int i = 0; i < 8; i++)
+    // {
+    //     pins[i] = doc[F("pins")][i];
+    // #ifdef ESP8266
+    //     pins[i] = DtoGPIO[pins[i]];
+    // #endif
+    // }
+
+    // const auto pwr_levels_json = doc[F("pwr_levels")];
+    // if (pwr_levels_json[F("override")].as<bool>()) {
+    //     power_levels.emplace(
+    //         Power{
+    //             .HEATERPOWER_STAGE1 = pwr_levels_json[F("heater_stage1")].as<int>(),
+    //             .HEATERPOWER_STAGE2 = pwr_levels_json[F("heater_stage2")].as<int>(),
+    //             .PUMPPOWER = pwr_levels_json[F("pump")].as<int>(),
+    //             .AIRPOWER = pwr_levels_json[F("air")].as<int>(),
+    //             .IDLEPOWER = pwr_levels_json[F("idle")].as<int>(),
+    //             .JETPOWER = pwr_levels_json[F("jet")].as<int>(),
+    //         }
+    //     );
+    // }
+    BWC_YIELD;
+
+    sHW_config_eeprom_t hwcfg;
+    EEPROM.begin(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t));
+    EEPROM.get(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t), hwcfg);
+    EEPROM.end();
+    if(*(uint32_t*)(hwcfg.tag) != 0x46435748) // "HWCF" in ascii (backwards)
     {
-        // Serial.println(F("Failed to open hwcfg.json"));
+        BWC_LOG_P(PSTR("No valid hwcfg in EEPROM"),0);
         return false;
     }
-    // DynamicJsonDocument doc(256);
-    StaticJsonDocument<512> doc;
-    DeserializationError error = deserializeJson(doc, file);
-    if (error) {
-        // Serial.println(F("Failed to read settings.txt"));
-        file.close();
-        return false;
+    cioNo = (Models)hwcfg.cioNo;
+    dspNo = (Models)hwcfg.dspNo;
+    hasTempSensor = hwcfg.hasTempSensor;
+    if(hwcfg.power_levels_override) {
+        power_levels.emplace(
+            Power{
+                .HEATERPOWER_STAGE1 = hwcfg.power_levels.HEATERPOWER_STAGE1,
+                .HEATERPOWER_STAGE2 = hwcfg.power_levels.HEATERPOWER_STAGE2,
+                .PUMPPOWER = hwcfg.power_levels.PUMPPOWER,
+                .AIRPOWER = hwcfg.power_levels.AIRPOWER,
+                .IDLEPOWER = hwcfg.power_levels.IDLEPOWER,
+                .JETPOWER = hwcfg.power_levels.JETPOWER,
+            }
+        );
     }
-    file.close();
-    cioNo = doc[F("cio")];
-    dspNo = doc[F("dsp")];
-
-    if(doc[F("hasTempSensor")].as<int>() == 1)
-    {
-        hasTempSensor = true;
-    }
-
-    String pcbname = doc[F("pcb")].as<String>();
-    // int pins[7];
+    pcb = hwcfg.pcbname;
     #ifdef ESP8266
     int DtoGPIO[] = {D0, D1, D2, D3, D4, D5, D6, D7, D8};
     #endif
     for(int i = 0; i < 8; i++)
     {
-        pins[i] = doc[F("pins")][i];
+        pins[i] = hwcfg.pins[i];
     #ifdef ESP8266
         pins[i] = DtoGPIO[pins[i]];
     #endif
     }
 
-    const auto pwr_levels_json = doc[F("pwr_levels")];
-    if (pwr_levels_json[F("override")].as<bool>()) {
-        power_levels.emplace(
-            Power{
-                .HEATERPOWER_STAGE1 = pwr_levels_json[F("heater_stage1")].as<int>(),
-                .HEATERPOWER_STAGE2 = pwr_levels_json[F("heater_stage2")].as<int>(),
-                .PUMPPOWER = pwr_levels_json[F("pump")].as<int>(),
-                .AIRPOWER = pwr_levels_json[F("air")].as<int>(),
-                .IDLEPOWER = pwr_levels_json[F("idle")].as<int>(),
-                .JETPOWER = pwr_levels_json[F("jet")].as<int>(),
-            }
-        );
-    }
-    BWC_YIELD;
     return true;
 }
 

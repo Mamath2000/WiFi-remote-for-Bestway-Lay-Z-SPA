@@ -26,6 +26,8 @@
 
 #include "FW_VERSION.h"
 #include "bwc_debug.h"
+#include <EEPROM.h>
+#include "enums.h"
 
 constexpr int MAXCOMMANDS = 20;
 
@@ -87,12 +89,13 @@ class BWC {
 
     public:
         time_t reboot_time_t;
-        String reboot_time_str;
         int pins[8];
         int tempSensorPin;
         unsigned int loop_count = 0;
         CIO* cio = nullptr;
         DSP* dsp = nullptr;
+        String reboot_time_str;
+        String pcb = "v2b";
         bool hasjets, hasgod;
         bool BWC_DEBUG = false;
         bool hasTempSensor = false;

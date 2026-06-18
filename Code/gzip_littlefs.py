@@ -51,7 +51,7 @@ def copy_gzip_data(source, target, env):
         shutil.copy2(src, dst)
 
   print("zipping html files")
-  shutil.copytree(data_dir, data_zip_dir, copy_function=copy_data)
+  shutil.copytree(data_dir, data_zip_dir, copy_function=copy_data, dirs_exist_ok=True)
 
 def del_gzip_data(source, target, env):
   print("Clearing zipped files")

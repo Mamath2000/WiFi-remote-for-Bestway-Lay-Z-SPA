@@ -29,6 +29,7 @@
 #include "config.h"
 #include "util.h"
 #include "bwc_debug.h"
+#include <EEPROM.h>
 
 BWC *bwc = nullptr;
 

@@ -699,18 +699,55 @@ void startHttpServer()
 
 void handleGetHardware()
 {
-    if (!checkHttpPost(server->method()))
-        return;
-    File file = LittleFS.open(F("hwcfg.json"), "r");
-    if (!file)
+    // if (!checkHttpPost(server->method()))
+    //     return;
+    // File file = LittleFS.open(F("hwcfg.json"), "r");
+
+    sHW_config_eeprom_t hw_config_eeprom;
+    EEPROM.begin(sizeof(sWifi_info_eeprom_t) + sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t));
+    EEPROM.get(sizeof(sWifi_info_eeprom_t) + sizeof(sMQTT_info_eeprom_t), hw_config_eeprom);
+    EEPROM.end();
+    if (*(uint32_t*)(hw_config_eeprom.tag) != 0x46435748) // "HWCF" in ascii (backwards)
     {
         // Serial.println(F("Failed to open hwcfg.json"));
         server->send(404, F("text/plain"), F("not found"));
         return;
     }
-    server->send(200, F("text/plain"), file.readString());
-    file.close();
+
+    //json-ify the data for easier parsing on the client side (web UI)
+    String json;
+    json.reserve(512);
+    json += "{";
+    json += "\"cio\": \"" + String(hw_config_eeprom.cioNo) + "\",";
+    json += "\"dsp\": \"" + String(hw_config_eeprom.dspNo) + "\",";
+    json += "\"pcb\": \"" + String(hw_config_eeprom.pcbname) + "\",";
+    json += "\"hasTempSensor\": ";
+    json += (hw_config_eeprom.hasTempSensor ? true : false);
+    json += ",";
+    json += "\"pins\": [";
+    for (int i = 0; i < 8; i++)
+    {
+        json += '\"';
+        json += String(hw_config_eeprom.pins[i]);
+        json += '\"';
+        if (i < 7)
+            json += ",";
+    }
+    json += "],";
+    json += "\"pwr_levels\": {";
+    json += "\"override\": ";
+    json += hw_config_eeprom.power_levels_override ? true : false;
+    json += ",";
+    json += "\"heater_stage1\": \"" + String(hw_config_eeprom.power_levels.HEATERPOWER_STAGE1) + "\",";
+    json += "\"heater_stage2\": \"" + String(hw_config_eeprom.power_levels.HEATERPOWER_STAGE2) + "\",";
+    json += "\"pump\": \"" + String(hw_config_eeprom.power_levels.PUMPPOWER) + "\",";
+    json += "\"idle\": \"" + String(hw_config_eeprom.power_levels.IDLEPOWER) + "\",";
+    json += "\"air\": \"" + String(hw_config_eeprom.power_levels.AIRPOWER) + "\",";
+    json += "\"jet\": \"" + String(hw_config_eeprom.power_levels.JETPOWER) + "\"";
+    json += "}}";
+    server->send(200, F("text/plain"), json);
     BWC_YIELD;
+
 }
 
 void handleSetHardware()
@@ -718,15 +755,48 @@ void handleSetHardware()
     if (!checkHttpPost(server->method()))
         return;
     String message = server->arg(0);
-    File file = LittleFS.open(F("hwcfg.json"), "w");
-    if (!file)
+
+    // File file = LittleFS.open(F("hwcfg.json"), "w");
+    // if (!file)
+    // {
+    //     // Serial.println(F("Failed to save hwcfg.json"));
+    //     return;
+    // }
+    // file.print(message);
+    // file.close();
+    DynamicJsonDocument doc(512);
+    DeserializationError error = deserializeJson(doc, message);
+    if (error)
     {
-        // Serial.println(F("Failed to save hwcfg.json"));
+        server->send(400, F("text/plain"), "Invalid JSON");
         return;
     }
-    file.print(message);
-    file.close();
     server->send(200, F("text/plain"), "ok");
+    sHW_config_eeprom_t hw_config_eeprom;
+    hw_config_eeprom.cioNo = doc["cio"];
+    hw_config_eeprom.dspNo = doc["dsp"];   
+    strcpy(hw_config_eeprom.pcbname, doc["pcb"].as<String>().c_str());
+    hw_config_eeprom.hasTempSensor = doc["hasTempSensor"];
+    for (int i = 0; i < 8; i++)
+    {
+        hw_config_eeprom.pins[i] = doc["pins"][i];
+    }
+    hw_config_eeprom.power_levels_override = doc["pwr_levels"]["override"];
+    hw_config_eeprom.power_levels.HEATERPOWER_STAGE1 = doc["pwr_levels"]["heater_stage1"];
+    hw_config_eeprom.power_levels.HEATERPOWER_STAGE2 = doc["pwr_levels"]["heater_stage2"];
+    hw_config_eeprom.power_levels.PUMPPOWER = doc["pwr_levels"]["pump"];
+    hw_config_eeprom.power_levels.IDLEPOWER = doc["pwr_levels"]["idle"];
+    hw_config_eeprom.power_levels.AIRPOWER = doc["pwr_levels"]["air"];
+    hw_config_eeprom.power_levels.JETPOWER = doc["pwr_levels"]["jet"];
+
+    EEPROM.begin(sizeof(sWifi_info_eeprom_t) + sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t));
+    EEPROM.put(sizeof(sWifi_info_eeprom_t) + sizeof(sMQTT_info_eeprom_t), hw_config_eeprom);
+    EEPROM.commit();
+    EEPROM.end();
+    BWC_LOG_P(PSTR("SetHardware > saved hw config to EEPROM. TAG: %c\n"), hw_config_eeprom.tag[0]);
+    BWC_LOG_P(PSTR("SetHardware > saved hw config to EEPROM. TAG: %c\n"), hw_config_eeprom.tag[1]);
+    BWC_LOG_P(PSTR("SetHardware > saved hw config to EEPROM. TAG: %c\n"), hw_config_eeprom.tag[2]);
+    BWC_LOG_P(PSTR("SetHardware > saved hw config to EEPROM. TAG: %c\n"), hw_config_eeprom.tag[3]);
     BWC_YIELD;
 }
 
@@ -1333,82 +1403,139 @@ void handleSetWebConfig()
  */
 void loadWifi()
 {
-    File file = LittleFS.open(F("/wifi.json"), "r");
-    if (!file)
-    {
-        // Serial.println(F("Failed to read wifi.json. Using defaults."));
-        return;
-    }
+    // File file = LittleFS.open(F("/wifi.json"), "r");
+    // if (!file)
+    // {
+    //     // Serial.println(F("Failed to read wifi.json. Using defaults."));
+    //     return;
+    // }
 
-    DynamicJsonDocument doc(1024);
+    // DynamicJsonDocument doc(1024);
 
-    DeserializationError error = deserializeJson(doc, file);
-    if (error)
-    {
-        // Serial.println(F("Failed to deserialize wifi.json"));
-        file.close();
-        return;
-    }
+    // DeserializationError error = deserializeJson(doc, file);
+    // if (error)
+    // {
+    //     // Serial.println(F("Failed to deserialize wifi.json"));
+    //     file.close();
+    //     return;
+    // }
 
-    wifi_info->enableAp = doc[F("enableAp")];
-    if (doc.containsKey(F("enableWM")))
-        wifi_info->enableWmApFallback = doc[F("enableWM")];
-    wifi_info->apSsid = doc[F("apSsid")].as<String>();
-    wifi_info->apPwd = doc[F("apPwd")].as<String>();
+    // wifi_info->enableAp = doc[F("enableAp")];
+    // if (doc.containsKey(F("enableWM")))
+    //     wifi_info->enableWmApFallback = doc[F("enableWM")];
+    // wifi_info->apSsid = doc[F("apSsid")].as<String>();
+    // wifi_info->apPwd = doc[F("apPwd")].as<String>();
 
-    wifi_info->enableStaticIp4 = doc[F("enableStaticIp4")];
-    String s(30);
-    wifi_info->ip4Address_str = doc[F("ip4Address")].as<String>();
-    wifi_info->ip4Gateway_str = doc[F("ip4Gateway")].as<String>();
-    wifi_info->ip4Subnet_str = doc[F("ip4Subnet")].as<String>();
-    wifi_info->ip4DnsPrimary_str = doc[F("ip4DnsPrimary")].as<String>();
-    wifi_info->ip4DnsSecondary_str = doc[F("ip4DnsSecondary")].as<String>();
-    wifi_info->ip4NTP_str = doc[F("ip4NTP")].as<String>();
+    // wifi_info->enableStaticIp4 = doc[F("enableStaticIp4")];
+    // String s(30);
+    // wifi_info->ip4Address_str = doc[F("ip4Address")].as<String>();
+    // wifi_info->ip4Gateway_str = doc[F("ip4Gateway")].as<String>();
+    // wifi_info->ip4Subnet_str = doc[F("ip4Subnet")].as<String>();
+    // wifi_info->ip4DnsPrimary_str = doc[F("ip4DnsPrimary")].as<String>();
+    // wifi_info->ip4DnsSecondary_str = doc[F("ip4DnsSecondary")].as<String>();
+    // wifi_info->ip4NTP_str = doc[F("ip4NTP")].as<String>();
 
-    // RF tuning fields — only override defaults if present, so older
-    // wifi.json files (no RF section yet) keep working with defaults.
-    if (doc.containsKey(F("txPowerDbm")))   wifi_info->txPowerDbm   = doc[F("txPowerDbm")].as<float>();
-    if (doc.containsKey(F("noModemSleep"))) wifi_info->noModemSleep = doc[F("noModemSleep")].as<bool>();
-    if (doc.containsKey(F("phyMode")))      wifi_info->phyMode      = doc[F("phyMode")].as<int>();
+    // // RF tuning fields — only override defaults if present, so older
+    // // wifi.json files (no RF section yet) keep working with defaults.
+    // if (doc.containsKey(F("txPowerDbm")))   wifi_info->txPowerDbm   = doc[F("txPowerDbm")].as<float>();
+    // if (doc.containsKey(F("noModemSleep"))) wifi_info->noModemSleep = doc[F("noModemSleep")].as<bool>();
+    // if (doc.containsKey(F("phyMode")))      wifi_info->phyMode      = doc[F("phyMode")].as<int>();
 
     BWC_YIELD;
+    //TODO: move this to the function that uses it. Don't forget to end eeprom. It will reserve memory always otherwise, even if not used.
+    EEPROM.begin(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t)); // EEPROM is used to store wifi credentials and other settings, so we need to init it before loading those settings.
+
+    sWifi_info_eeprom_t wifi_info_eeprom;
+    EEPROM.get(0, wifi_info_eeprom);
+    EEPROM.end();
+    if(*(uint32_t*)(wifi_info_eeprom.tag) != 0x49464957) { // "WIFI" in hex (backwards), used to check if the eeprom contains valid wifi config
+        BWC_LOG_P(PSTR("No valid wifi config in EEPROM. Using defaults."),0);
+        return;
+    }   
+    wifi_info->apSsid = wifi_info_eeprom.apSsid;
+    wifi_info->apPwd = wifi_info_eeprom.apPwd;
+    IPAddress myip;
+    myip = wifi_info_eeprom.ip4Address;
+    wifi_info->ip4Address_str = myip.toString();
+    myip = wifi_info_eeprom.ip4Gateway;
+    wifi_info->ip4Gateway_str = myip.toString();
+    myip = wifi_info_eeprom.ip4Subnet;
+    wifi_info->ip4Subnet_str = myip.toString();
+    myip = wifi_info_eeprom.ip4DnsPrimary;
+    wifi_info->ip4DnsPrimary_str = myip.toString();
+    myip = wifi_info_eeprom.ip4DnsSecondary;
+    wifi_info->ip4DnsSecondary_str = myip.toString();
+    myip = wifi_info_eeprom.ip4NTP;
+    wifi_info->ip4NTP_str = myip.toString();
+    wifi_info->enableAp = wifi_info_eeprom.enableAp;
+    wifi_info->enableWmApFallback = wifi_info_eeprom.enableWmApFallback;
+    wifi_info->enableStaticIp4 = wifi_info_eeprom.enableStaticIp4;
+    wifi_info->txPowerDbm = wifi_info_eeprom.txPowerDbm;
+    wifi_info->noModemSleep = wifi_info_eeprom.noModemSleep;
+    wifi_info->phyMode = wifi_info_eeprom.phyMode;
 }
 
 /**
- * save WiFi json configuration to "wifi.json"
+ * save WiFi json configuration to EEPROM
  */
 void saveWifi()
 {
-    File file = LittleFS.open(F("/wifi.json"), "w");
-    if (!file)
-    {
-        // Serial.println(F("Failed to save wifi.json"));
+    // File file = LittleFS.open(F("/wifi.json"), "w");
+    // if (!file)
+    // {
+    //     // Serial.println(F("Failed to save wifi.json"));
+    //     return;
+    // }
+
+    // DynamicJsonDocument doc(1024);
+
+    // doc[F("enableAp")] = wifi_info->enableAp;
+    // doc[F("enableWM")] = wifi_info->enableWmApFallback;
+    // doc[F("apSsid")] = wifi_info->apSsid;
+    // doc[F("apPwd")] = wifi_info->apPwd;
+    // doc[F("enableStaticIp4")] = wifi_info->enableStaticIp4;
+    // doc[F("ip4Address")] = wifi_info->ip4Address_str;
+    // doc[F("ip4Gateway")] = wifi_info->ip4Gateway_str;
+    // doc[F("ip4Subnet")] = wifi_info->ip4Subnet_str;
+    // doc[F("ip4DnsPrimary")] = wifi_info->ip4DnsPrimary_str;
+    // doc[F("ip4DnsSecondary")] = wifi_info->ip4DnsSecondary_str;
+    // doc[F("ip4NTP")] = wifi_info->ip4NTP_str;
+    // doc[F("txPowerDbm")]   = wifi_info->txPowerDbm;
+    // doc[F("noModemSleep")] = wifi_info->noModemSleep;
+    // doc[F("phyMode")]      = wifi_info->phyMode;
+
+    // if (serializeJson(doc, file) == 0)
+    // {
+    //     // Serial.println(F("{\"error\": \"Failed to serialize file\"}"));
+    // }
+    // file.close();
+    BWC_YIELD;
+    EEPROM.begin(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t)); // EEPROM is used to store wifi credentials and other settings, so we need to init it before loading those settings.
+
+    sWifi_info_eeprom_t wifi_info_eeprom;
+    BWC_LOG_P(PSTR("Size of eeprom: %d\n"), sizeof(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t)));
+    if(wifi_info->apSsid.length() >= sizeof(wifi_info_eeprom.apSsid) || wifi_info->apPwd.length() >= sizeof(wifi_info_eeprom.apPwd)) {
+        BWC_LOG_P(PSTR("WiFi SSID or password too long to save to EEPROM"),0);
         return;
     }
-
-    DynamicJsonDocument doc(1024);
-
-    doc[F("enableAp")] = wifi_info->enableAp;
-    doc[F("enableWM")] = wifi_info->enableWmApFallback;
-    doc[F("apSsid")] = wifi_info->apSsid;
-    doc[F("apPwd")] = wifi_info->apPwd;
-    doc[F("enableStaticIp4")] = wifi_info->enableStaticIp4;
-    doc[F("ip4Address")] = wifi_info->ip4Address_str;
-    doc[F("ip4Gateway")] = wifi_info->ip4Gateway_str;
-    doc[F("ip4Subnet")] = wifi_info->ip4Subnet_str;
-    doc[F("ip4DnsPrimary")] = wifi_info->ip4DnsPrimary_str;
-    doc[F("ip4DnsSecondary")] = wifi_info->ip4DnsSecondary_str;
-    doc[F("ip4NTP")] = wifi_info->ip4NTP_str;
-    doc[F("txPowerDbm")]   = wifi_info->txPowerDbm;
-    doc[F("noModemSleep")] = wifi_info->noModemSleep;
-    doc[F("phyMode")]      = wifi_info->phyMode;
-
-    if (serializeJson(doc, file) == 0)
-    {
-        // Serial.println(F("{\"error\": \"Failed to serialize file\"}"));
-    }
-    file.close();
-    BWC_YIELD;
+    strcpy(wifi_info_eeprom.apSsid, wifi_info->apSsid.c_str());
+    strcpy(wifi_info_eeprom.apPwd, wifi_info->apPwd.c_str());
+    IPAddress myip;
+    wifi_info_eeprom.ip4Address = myip.fromString(wifi_info->ip4Address_str);
+    wifi_info_eeprom.ip4Gateway = myip.fromString(wifi_info->ip4Gateway_str);
+    wifi_info_eeprom.ip4Subnet = myip.fromString(wifi_info->ip4Subnet_str);
+    wifi_info_eeprom.ip4DnsPrimary = myip.fromString(wifi_info->ip4DnsPrimary_str);
+    wifi_info_eeprom.ip4DnsSecondary = myip.fromString(wifi_info->ip4DnsSecondary_str);
+    wifi_info_eeprom.ip4NTP = myip.fromString(wifi_info->ip4NTP_str);
+    wifi_info_eeprom.enableAp = wifi_info->enableAp;
+    wifi_info_eeprom.enableWmApFallback = wifi_info->enableWmApFallback;
+    wifi_info_eeprom.enableStaticIp4 = wifi_info->enableStaticIp4;
+    wifi_info_eeprom.txPowerDbm = wifi_info->txPowerDbm;
+    wifi_info_eeprom.noModemSleep = wifi_info->noModemSleep;
+    wifi_info_eeprom.phyMode = wifi_info->phyMode;
+    EEPROM.put(0, wifi_info_eeprom);
+    EEPROM.commit();
+    EEPROM.end();
 }
 
 /**
@@ -1543,32 +1670,49 @@ void resetWiFi()
  */
 void loadMqtt()
 {
-    File file = LittleFS.open("mqtt.json", "r");
-    if (!file)
-    {
-        BWC_LOG_P(PSTR("MQTT > Failed to read mqtt.json. Using defaults.\n"), 0);
-        return;
-    }
+    // File file = LittleFS.open("mqtt.json", "r");
+    // if (!file)
+    // {
+    //     BWC_LOG_P(PSTR("MQTT > Failed to read mqtt.json. Using defaults.\n"), 0);
+    //     return;
+    // }
 
-    DynamicJsonDocument doc(1024);
+    // DynamicJsonDocument doc(1024);
 
-    DeserializationError error = deserializeJson(doc, file);
-    if (error)
-    {
-        // Serial.println(F("Failed to deserialize mqtt.json."));
-        file.close();
-        return;
-    }
+    // DeserializationError error = deserializeJson(doc, file);
+    // if (error)
+    // {
+    //     // Serial.println(F("Failed to deserialize mqtt.json."));
+    //     file.close();
+    //     return;
+    // }
 
-    mqtt_info->useMqtt = doc[F("enableMqtt")];
-    mqtt_info->mqttHost = doc[F("mqttHost")].as<String>();
-    mqtt_info->mqttPort = doc[F("mqttPort")];
-    mqtt_info->mqttUsername = doc[F("mqttUsername")].as<String>();
-    mqtt_info->mqttPassword = doc[F("mqttPassword")].as<String>();
-    mqtt_info->mqttClientId = doc[F("mqttClientId")].as<String>();
-    mqtt_info->mqttBaseTopic = doc[F("mqttBaseTopic")].as<String>();
-    mqtt_info->mqttTelemetryInterval = doc[F("mqttTelemetryInterval")];
+    // mqtt_info->useMqtt = doc[F("enableMqtt")];
+    // mqtt_info->mqttHost = doc[F("mqttHost")].as<String>();
+    // mqtt_info->mqttPort = doc[F("mqttPort")];
+    // mqtt_info->mqttUsername = doc[F("mqttUsername")].as<String>();
+    // mqtt_info->mqttPassword = doc[F("mqttPassword")].as<String>();
+    // mqtt_info->mqttClientId = doc[F("mqttClientId")].as<String>();
+    // mqtt_info->mqttBaseTopic = doc[F("mqttBaseTopic")].as<String>();
+    // mqtt_info->mqttTelemetryInterval = doc[F("mqttTelemetryInterval")];
     BWC_YIELD;
+    //TODO: move this to the function that uses it. Don't forget to end eeprom. It will reserve memory always otherwise, even if not used.
+    EEPROM.begin(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t)); // EEPROM is used to store wifi credentials and other settings, so we need to init it before loading those settings.
+    sMQTT_info_eeprom_t mqtt_info_eeprom;
+    EEPROM.get(sizeof(sWifi_info_eeprom_t), mqtt_info_eeprom);
+    EEPROM.end();
+    if(*(uint32_t*)(mqtt_info_eeprom.tag) != 0x5454514D) { // "MQTT" in hex (backwards), used to check if the eeprom contains valid mqtt config
+        BWC_LOG_P(PSTR("No valid MQTT config in EEPROM. Using defaults.\n"), 0);
+        return;
+    }
+    mqtt_info->mqttHost = mqtt_info_eeprom.mqttHost;
+    mqtt_info->mqttPort = mqtt_info_eeprom.mqttPort;
+    mqtt_info->mqttUsername = mqtt_info_eeprom.mqttUsername;
+    mqtt_info->mqttPassword = mqtt_info_eeprom.mqttPassword;
+    mqtt_info->mqttClientId = mqtt_info_eeprom.mqttClientId;
+    mqtt_info->mqttBaseTopic = mqtt_info_eeprom.mqttBaseTopic;
+    mqtt_info->mqttTelemetryInterval = mqtt_info_eeprom.mqttTelemetryInterval;
+    mqtt_info->useMqtt = mqtt_info_eeprom.useMqtt;
 }
 
 /**
@@ -1576,30 +1720,50 @@ void loadMqtt()
  */
 void saveMqtt()
 {
-    File file = LittleFS.open("mqtt.json", "w");
-    if (!file)
-    {
-        // Serial.println(F("Failed to save mqtt.json"));
+    // File file = LittleFS.open("mqtt.json", "w");
+    // if (!file)
+    // {
+    //     // Serial.println(F("Failed to save mqtt.json"));
+    //     return;
+    // }
+
+    // DynamicJsonDocument doc(1024);
+
+    // doc[F("enableMqtt")] = mqtt_info->useMqtt;
+    // doc[F("mqttHost")] = mqtt_info->mqttHost;
+    // doc[F("mqttPort")] = mqtt_info->mqttPort;
+    // doc[F("mqttUsername")] = mqtt_info->mqttUsername;
+    // doc[F("mqttPassword")] = mqtt_info->mqttPassword;
+    // doc[F("mqttClientId")] = mqtt_info->mqttClientId;
+    // doc[F("mqttBaseTopic")] = mqtt_info->mqttBaseTopic;
+    // doc[F("mqttTelemetryInterval")] = mqtt_info->mqttTelemetryInterval;
+
+    // if (serializeJson(doc, file) == 0)
+    // {
+    //     // Serial.println(F("{\"error\": \"Failed to serialize file\"}"));
+    // }
+    // file.close();
+    BWC_YIELD;
+        //TODO: move this to the function that uses it. Don't forget to end eeprom. It will reserve memory always otherwise, even if not used.
+    EEPROM.begin(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t)); // EEPROM is used to store wifi credentials and other settings, so we need to init it before loading those settings.
+    sMQTT_info_eeprom_t mqtt_info_eeprom;
+    BWC_LOG_P(PSTR("Size of mqtt_info_eeprom: %d\n"), sizeof(mqtt_info_eeprom));  
+    if(mqtt_info->mqttHost.length() >= sizeof(mqtt_info_eeprom.mqttHost) || mqtt_info->mqttUsername.length() >= sizeof(mqtt_info_eeprom.mqttUsername) || mqtt_info->mqttPassword.length() >= sizeof(mqtt_info_eeprom.mqttPassword) || mqtt_info->mqttClientId.length() >= sizeof(mqtt_info_eeprom.mqttClientId) || mqtt_info->mqttBaseTopic.length() >= sizeof(mqtt_info_eeprom.mqttBaseTopic)) {
+        BWC_LOG_P(PSTR("MQTT config fields too long to save to EEPROM"),0);
         return;
     }
-
-    DynamicJsonDocument doc(1024);
-
-    doc[F("enableMqtt")] = mqtt_info->useMqtt;
-    doc[F("mqttHost")] = mqtt_info->mqttHost;
-    doc[F("mqttPort")] = mqtt_info->mqttPort;
-    doc[F("mqttUsername")] = mqtt_info->mqttUsername;
-    doc[F("mqttPassword")] = mqtt_info->mqttPassword;
-    doc[F("mqttClientId")] = mqtt_info->mqttClientId;
-    doc[F("mqttBaseTopic")] = mqtt_info->mqttBaseTopic;
-    doc[F("mqttTelemetryInterval")] = mqtt_info->mqttTelemetryInterval;
-
-    if (serializeJson(doc, file) == 0)
-    {
-        // Serial.println(F("{\"error\": \"Failed to serialize file\"}"));
-    }
-    file.close();
-    BWC_YIELD;
+    strcpy(mqtt_info_eeprom.mqttHost, mqtt_info->mqttHost.c_str());
+    BWC_LOG_P(PSTR("Saving MQTT Host: %s\n"), mqtt_info->mqttHost.c_str());
+    mqtt_info_eeprom.mqttTelemetryInterval = mqtt_info->mqttTelemetryInterval;
+    mqtt_info_eeprom.mqttPort = mqtt_info->mqttPort;
+    strcpy(mqtt_info_eeprom.mqttUsername, mqtt_info->mqttUsername.c_str());
+    strcpy(mqtt_info_eeprom.mqttPassword, mqtt_info->mqttPassword.c_str());
+    strcpy(mqtt_info_eeprom.mqttClientId, mqtt_info->mqttClientId.c_str());
+    strcpy(mqtt_info_eeprom.mqttBaseTopic, mqtt_info->mqttBaseTopic.c_str());
+    mqtt_info_eeprom.useMqtt = mqtt_info->useMqtt;
+    EEPROM.put(sizeof(sWifi_info_eeprom_t), mqtt_info_eeprom);
+    EEPROM.commit();
+    EEPROM.end();
 }
 
 /**
