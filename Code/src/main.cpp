@@ -378,8 +378,6 @@ void wifi_manual_reconnect()
     /* Connect in station mode to the AP given (your router/ap) */
     if (wifi_info->enableAp)
     {
-        BWC_LOG_P(PSTR("WiFi > using WiFi configuration with SSID %s\n"), wifi_info->apSsid.c_str());
-
         WiFi.begin(wifi_info->apSsid.c_str(), wifi_info->apPwd.c_str());
         // checkWifi_ticker->attach(2.0, checkWiFi_ISR);
         BWC_LOG_P(PSTR("WiFi > AP info loaded. Waiting for connection ...\n"), 0);
@@ -793,10 +791,7 @@ void handleSetHardware()
     EEPROM.put(sizeof(sWifi_info_eeprom_t) + sizeof(sMQTT_info_eeprom_t), hw_config_eeprom);
     EEPROM.commit();
     EEPROM.end();
-    BWC_LOG_P(PSTR("SetHardware > saved hw config to EEPROM. TAG: %c\n"), hw_config_eeprom.tag[0]);
-    BWC_LOG_P(PSTR("SetHardware > saved hw config to EEPROM. TAG: %c\n"), hw_config_eeprom.tag[1]);
-    BWC_LOG_P(PSTR("SetHardware > saved hw config to EEPROM. TAG: %c\n"), hw_config_eeprom.tag[2]);
-    BWC_LOG_P(PSTR("SetHardware > saved hw config to EEPROM. TAG: %c\n"), hw_config_eeprom.tag[3]);
+    BWC_LOG_P(PSTR("HW config saved to EEPROM\n"), 0);
     BWC_YIELD;
 }
 
@@ -1442,18 +1437,18 @@ void loadWifi()
     // if (doc.containsKey(F("phyMode")))      wifi_info->phyMode      = doc[F("phyMode")].as<int>();
 
     BWC_YIELD;
-    //TODO: move this to the function that uses it. Don't forget to end eeprom. It will reserve memory always otherwise, even if not used.
     EEPROM.begin(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t)); // EEPROM is used to store wifi credentials and other settings, so we need to init it before loading those settings.
 
     sWifi_info_eeprom_t wifi_info_eeprom;
     EEPROM.get(0, wifi_info_eeprom);
     EEPROM.end();
     if(*(uint32_t*)(wifi_info_eeprom.tag) != 0x49464957) { // "WIFI" in hex (backwards), used to check if the eeprom contains valid wifi config
-        BWC_LOG_P(PSTR("No valid wifi config in EEPROM. Using defaults."),0);
+        BWC_LOG_P(PSTR("No valid wifi config in EEPROM. Using defaults.\n"),0);
         return;
     }   
-    wifi_info->apSsid = wifi_info_eeprom.apSsid;
-    wifi_info->apPwd = wifi_info_eeprom.apPwd;
+    wifi_info->apSsid = String(wifi_info_eeprom.apSsid);
+    wifi_info->apPwd = String(wifi_info_eeprom.apPwd);
+    BWC_LOG_P(PSTR("Loaded WiFi config: %s\n"), wifi_info->apSsid.c_str());
     IPAddress myip;
     myip = wifi_info_eeprom.ip4Address;
     wifi_info->ip4Address_str = myip.toString();
@@ -1513,20 +1508,26 @@ void saveWifi()
     EEPROM.begin(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t)); // EEPROM is used to store wifi credentials and other settings, so we need to init it before loading those settings.
 
     sWifi_info_eeprom_t wifi_info_eeprom;
-    BWC_LOG_P(PSTR("Size of eeprom: %d\n"), sizeof(sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t)));
+    BWC_LOG_P(PSTR("Size of eeprom: %d\n"), sizeof(sWifi_info_eeprom_t)+sizeof(sMQTT_info_eeprom_t)+sizeof(sHW_config_eeprom_t));
     if(wifi_info->apSsid.length() >= sizeof(wifi_info_eeprom.apSsid) || wifi_info->apPwd.length() >= sizeof(wifi_info_eeprom.apPwd)) {
-        BWC_LOG_P(PSTR("WiFi SSID or password too long to save to EEPROM"),0);
+        BWC_LOG_P(PSTR("WiFi SSID or password too long to save to EEPROM\n"),0);
         return;
     }
     strcpy(wifi_info_eeprom.apSsid, wifi_info->apSsid.c_str());
     strcpy(wifi_info_eeprom.apPwd, wifi_info->apPwd.c_str());
     IPAddress myip;
-    wifi_info_eeprom.ip4Address = myip.fromString(wifi_info->ip4Address_str);
-    wifi_info_eeprom.ip4Gateway = myip.fromString(wifi_info->ip4Gateway_str);
-    wifi_info_eeprom.ip4Subnet = myip.fromString(wifi_info->ip4Subnet_str);
-    wifi_info_eeprom.ip4DnsPrimary = myip.fromString(wifi_info->ip4DnsPrimary_str);
-    wifi_info_eeprom.ip4DnsSecondary = myip.fromString(wifi_info->ip4DnsSecondary_str);
-    wifi_info_eeprom.ip4NTP = myip.fromString(wifi_info->ip4NTP_str);
+    myip.fromString(wifi_info->ip4Address_str);
+    wifi_info_eeprom.ip4Address = (uint32_t)myip;
+    myip.fromString(wifi_info->ip4Gateway_str);
+    wifi_info_eeprom.ip4Gateway = (uint32_t)myip;
+    myip.fromString(wifi_info->ip4Subnet_str);
+    wifi_info_eeprom.ip4Subnet = (uint32_t)myip;
+    myip.fromString(wifi_info->ip4DnsPrimary_str);
+    wifi_info_eeprom.ip4DnsPrimary = (uint32_t)myip;
+    myip.fromString(wifi_info->ip4DnsSecondary_str);
+    wifi_info_eeprom.ip4DnsSecondary = (uint32_t)myip;
+    myip.fromString(wifi_info->ip4NTP_str);
+    wifi_info_eeprom.ip4NTP = (uint32_t)myip;
     wifi_info_eeprom.enableAp = wifi_info->enableAp;
     wifi_info_eeprom.enableWmApFallback = wifi_info->enableWmApFallback;
     wifi_info_eeprom.enableStaticIp4 = wifi_info->enableStaticIp4;
@@ -1595,7 +1596,7 @@ void handleSetWifi()
         server->send(400, F("text/plain"), F("Error deserializing message"));
         return;
     }
-
+    BWC_LOG_P(PSTR("Received WiFi config: %s\n"), message.c_str());
     wifi_info->enableAp = doc[F("enableAp")];
     if (doc.containsKey("enableWM"))
         wifi_info->enableWmApFallback = doc[F("enableWM")];
@@ -1612,7 +1613,6 @@ void handleSetWifi()
     if (doc.containsKey(F("txPowerDbm")))   wifi_info->txPowerDbm   = doc[F("txPowerDbm")].as<float>();
     if (doc.containsKey(F("noModemSleep"))) wifi_info->noModemSleep = doc[F("noModemSleep")].as<bool>();
     if (doc.containsKey(F("phyMode")))      wifi_info->phyMode      = doc[F("phyMode")].as<int>();
-
     saveWifi();
 
     server->send(200, F("text/plain"), "");

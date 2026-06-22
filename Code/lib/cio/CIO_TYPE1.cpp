@@ -77,18 +77,20 @@ void CIO_6_TYPE1::updateStates()
     enum Readmode: int {readtemperature, uncertain, readtarget};
     static Readmode capturePhase = readtemperature;
 
-    //require two consecutive messages to be equal before registering
-    #if FILTER_6W_SPIKES==1
-    static uint8_t prev_checksum = 0;
-    uint8_t checksum = 0;
-    for(int i = 0; i < 11; i++){
-        checksum += _payload[i];
-    }
-    if(checksum != prev_checksum) {
-        prev_checksum = checksum;
-        return;
-    }
-    #endif
+//require 2 consecutive messages to be equal before registering
+#ifdef FILTER_6W_SPIKES
+static uint8_t prev_checksum = 0;
+uint8_t checksum = 0;
+//calc checksum of received payload
+for(int i = 0; i < 11; i++){
+    checksum += _payload[i];
+}
+
+if(checksum != prev_checksum) {
+    prev_checksum = checksum;
+    return;
+}
+#endif
 
     //copy private array to public array
     for(unsigned int i = 0; i < sizeof(_payload); i++){
@@ -96,8 +98,6 @@ void CIO_6_TYPE1::updateStates()
     }
     good_packets_count++;
     brightness = _brightness & 7; //extract only the brightness bits (0-7)
-    cio_states.locked = (_raw_payload_from_cio[LCK_IDX] & (1 << LCK_BIT)) > 0;
-    cio_states.power = (_raw_payload_from_cio[PWR_IDX] & (1 << PWR_BIT)) > 0;
     /*If both leds are out, don't change (When TIMER is pressed)*/
     if(_raw_payload_from_cio[C_IDX] & (1 << C_BIT) || _raw_payload_from_cio[F_IDX] & (1 << F_BIT))
 //defined in platformio.ini to counter occasional bitflips on the unit, making homeassistant graphs look ugly
@@ -108,17 +108,42 @@ void CIO_6_TYPE1::updateStates()
 #else
         cio_states.unit = (_raw_payload_from_cio[C_IDX] & (1 << C_BIT)) > 0;
 #endif
-        cio_states.bubbles = (_raw_payload_from_cio[AIR_IDX] & (1 << AIR_BIT)) > 0;
-        cio_states.heatgrn = (_raw_payload_from_cio[GRNHTR_IDX] & (1 << GRNHTR_BIT)) > 0;
-        cio_states.heatred = (_raw_payload_from_cio[REDHTR_IDX] & (1 << REDHTR_BIT)) > 0;
-        cio_states.timerled1 = (_raw_payload_from_cio[TMR1_IDX] & (1 << TMR1_BIT)) > 0;
-        cio_states.timerled2 = (_raw_payload_from_cio[TMR2_IDX] & (1 << TMR2_BIT)) > 0;
-        cio_states.timerbuttonled = (_raw_payload_from_cio[TMRBTNLED_IDX] & (1 << TMRBTNLED_BIT)) > 0;
-        cio_states.heat = cio_states.heatgrn || cio_states.heatred;
-        cio_states.pump = (_raw_payload_from_cio[FLT_IDX] & (1 << FLT_BIT)) > 0;
-        cio_states.char1 = (uint8_t)_getChar(_raw_payload_from_cio[DGT1_IDX]);
-        cio_states.char2 = (uint8_t)_getChar(_raw_payload_from_cio[DGT2_IDX]);
-        cio_states.char3 = (uint8_t)_getChar(_raw_payload_from_cio[DGT3_IDX]);
+#if FILTER_6W_SPIKES >= 1
+static uint8_t counter = 0;
+static uint8_t current_states = 0;
+static uint8_t prev_states = 0;
+//put filtered entities here
+current_states |= (((_raw_payload_from_cio[LCK_IDX] & (1 << LCK_BIT)) > 0) << 0);
+current_states |= (((_raw_payload_from_cio[PWR_IDX] & (1 << PWR_BIT)) > 0) << 1);
+current_states |= (((_raw_payload_from_cio[AIR_IDX] & (1 << AIR_BIT)) > 0) << 2);
+current_states |= (((_raw_payload_from_cio[GRNHTR_IDX] & (1 << GRNHTR_BIT)) > 0) << 3);
+current_states |= (((_raw_payload_from_cio[REDHTR_IDX] & (1 << REDHTR_BIT)) > 0) << 4);
+current_states |= (((_raw_payload_from_cio[FLT_IDX] & (1 << FLT_BIT)) > 0) << 5);
+current_states |= (((_raw_payload_from_cio[HJT_IDX] & (1 << HJT_BIT)) > 0) << 6);
+
+if(current_states == prev_states) {
+    counter++;
+} else {
+    counter = 0;
+    prev_states = current_states;
+}
+if(counter < FILTER_6W_SPIKES) {
+    return;
+}
+#endif
+    cio_states.locked = (_raw_payload_from_cio[LCK_IDX] & (1 << LCK_BIT)) > 0;
+    cio_states.power = (_raw_payload_from_cio[PWR_IDX] & (1 << PWR_BIT)) > 0;
+    cio_states.bubbles = (_raw_payload_from_cio[AIR_IDX] & (1 << AIR_BIT)) > 0;
+    cio_states.heatgrn = (_raw_payload_from_cio[GRNHTR_IDX] & (1 << GRNHTR_BIT)) > 0;
+    cio_states.heatred = (_raw_payload_from_cio[REDHTR_IDX] & (1 << REDHTR_BIT)) > 0;
+    cio_states.timerled1 = (_raw_payload_from_cio[TMR1_IDX] & (1 << TMR1_BIT)) > 0;
+    cio_states.timerled2 = (_raw_payload_from_cio[TMR2_IDX] & (1 << TMR2_BIT)) > 0;
+    cio_states.timerbuttonled = (_raw_payload_from_cio[TMRBTNLED_IDX] & (1 << TMRBTNLED_BIT)) > 0;
+    cio_states.heat = cio_states.heatgrn || cio_states.heatred;
+    cio_states.pump = (_raw_payload_from_cio[FLT_IDX] & (1 << FLT_BIT)) > 0;
+    cio_states.char1 = (uint8_t)_getChar(_raw_payload_from_cio[DGT1_IDX]);
+    cio_states.char2 = (uint8_t)_getChar(_raw_payload_from_cio[DGT2_IDX]);
+    cio_states.char3 = (uint8_t)_getChar(_raw_payload_from_cio[DGT3_IDX]);
     if(getHasjets()) 
         cio_states.jets = (_raw_payload_from_cio[HJT_IDX] & (1 << HJT_BIT)) > 0;
     else 

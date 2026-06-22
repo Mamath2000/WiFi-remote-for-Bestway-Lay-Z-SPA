@@ -37,3 +37,4 @@ Code/.vscode/extensions.json
 
 ## filesystem
 Code/data/
+Code/platformio_override.ini
