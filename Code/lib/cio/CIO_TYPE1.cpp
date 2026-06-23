@@ -74,6 +74,7 @@ void CIO_6_TYPE1::updateStates()
         return;
     }
     static uint32_t buttonReleaseTime;
+    static uint32_t errorTime;
     enum Readmode: int {readtemperature, uncertain, readtarget};
     static Readmode capturePhase = readtemperature;
 
@@ -163,12 +164,16 @@ if(counter < FILTER_6W_SPIKES) {
         errornumber = (char)cio_states.char2;
         errornumber += (char)cio_states.char3;
         cio_states.error = (uint8_t)(errornumber.toInt());
+        errorTime = millis();
         return;
     } 
     if(cio_states.char3 == 'H' || cio_states.char3 == ' ') return;
 
     /* Reset error state */
-    cio_states.error = 0;
+    if((millis() - errorTime > 5000) && (cio_states.error != 0)) {
+        cio_states.error = 0;
+        // errorTime = 0; // Reset errorTime (not necessary, but can be done for clarity)
+    }
 
     //capture TARGET after UP/DOWN has been pressed...
     if ((_button_code == getButtonCode(UP)) || (_button_code == getButtonCode(DOWN)))
