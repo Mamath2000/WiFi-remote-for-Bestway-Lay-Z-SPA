@@ -1935,7 +1935,8 @@ void mqttConnect()
         mqttClient->loop();
         sendMQTT();
         BWC_LOG_P(PSTR("MQTT > Sending HA discovery"),0);
-        mqttClient->setBufferSize(1536);
+        // Increase buffer to accommodate larger HA discovery payloads with long-form keys
+        mqttClient->setBufferSize(8192);
         setupHA();
         mqttClient->setBufferSize(512);
         mqttClient->loop();
