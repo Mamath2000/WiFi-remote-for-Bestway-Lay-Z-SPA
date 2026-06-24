@@ -4,3 +4,5 @@
 .vscode/launch.json
 .vscode/ipch
 data/*.json
+build.cpython-311.pyc
+template_engine.cpython-311.pyc
