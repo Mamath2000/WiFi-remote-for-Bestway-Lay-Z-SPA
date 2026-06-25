@@ -20,6 +20,8 @@ BWC::BWC()
     _pumptime_daily_ms = 0;
     _heatingtime_daily_ms = 0;
     _airtime_daily_ms = 0;
+    _jettime_daily_ms = 0;
+    _uptime_daily_ms = 0;
     _price = 1.0;
     _filter_rinse_interval = 7;
     _filter_clean_interval = 20;
@@ -515,6 +517,8 @@ bool BWC::_handlecommand(Commands cmd, int64_t val, const String& txt="")
         _pumptime_daily_ms = 0;
         _heatingtime_daily_ms = 0;
         _airtime_daily_ms = 0;
+        _jettime_daily_ms = 0;
+        _uptime_daily_ms = 0;
         _save_settings_needed = true;
         _new_data_available = true;
         break;
@@ -1062,7 +1066,7 @@ void BWC::getJSONTimes(String &rtn) {
     #ifdef ESP8266
     ESP.wdtFeed();
     #endif
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(1536);
 
     // Set the values in the document
     doc[F("CONTENT")] = F("TIMES");
@@ -1078,6 +1082,8 @@ void BWC::getJSONTimes(String &rtn) {
     doc[F("PUMPTIMED")] = _pumptime_daily_ms / 1000;
     doc[F("HEATINGTIMED")] = _heatingtime_daily_ms / 1000;
     doc[F("AIRTIMED")] = _airtime_daily_ms / 1000;
+    doc[F("JETTIMED")] = _jettime_daily_ms / 1000;
+    doc[F("UPTIMED")] = _uptime_daily_ms / 1000;
     doc[F("JETTIME")] = _jettime + _jettime_ms/1000;
     doc[F("COST")] = _energy_cost_total;
     doc[F("COSTD")] = _energy_cost_daily;
@@ -1088,6 +1094,18 @@ void BWC::getJSONTimes(String &rtn) {
     doc[F("KWH")] = _energy_total_Ws / 3600000.0; //Ws -> kWh
     doc[F("KWHD")] = _energy_daily_Ws / 3600000.0; //Ws -> kWh
     doc[F("WATT")] = _energy_power_W;
+    auto pl = cio->getPowerLevels();
+    int heaterPwr = cio->getHeaterPower();
+    doc[F("WATT_PUMP")] = cio->cio_states.pump    ? pl.PUMPPOWER : 0;
+    doc[F("WATT_HEAT")] = cio->cio_states.heatred ? heaterPwr    : 0;
+    doc[F("WATT_AIR")]  = cio->cio_states.bubbles ? pl.AIRPOWER  : 0;
+    doc[F("WATT_JET")]  = cio->cio_states.jets    ? pl.JETPOWER  : 0;
+    doc[F("WATT_IDLE")] = pl.IDLEPOWER;
+    doc[F("KWH_PUMP")] = (_pumptime    + _pumptime_ms/1000)    * (double)pl.PUMPPOWER  / 3600000.0;
+    doc[F("KWH_HEAT")] = (_heatingtime + _heatingtime_ms/1000) * (double)heaterPwr     / 3600000.0;
+    doc[F("KWH_AIR")]  = (_airtime     + _airtime_ms/1000)     * (double)pl.AIRPOWER   / 3600000.0;
+    doc[F("KWH_JET")]  = (_jettime     + _jettime_ms/1000)     * (double)pl.JETPOWER   / 3600000.0;
+    doc[F("KWH_IDLE")] = (_uptime      + _uptime_ms/1000)      * (double)pl.IDLEPOWER  / 3600000.0;
     float t2r = _estHeatingTime();
     String t2r_string = F("Not ready");
     if(t2r == -2) t2r_string = F("Ready");
@@ -1268,8 +1286,10 @@ void BWC::_updateTimes(){
     }
     if(cio->cio_states.jets){
         _jettime_ms += elapsedtime_ms;
+        _jettime_daily_ms += elapsedtime_ms;
     }
     _uptime_ms += elapsedtime_ms;
+    _uptime_daily_ms += elapsedtime_ms;
 
 
     if(_uptime_ms > 1000000000){
@@ -1418,6 +1438,8 @@ void BWC::_loadSettings(){
     _pumptime_daily_ms = (uint32_t)(doc[F("PUMPTIMED")] | 0) * 1000;
     _heatingtime_daily_ms = (uint32_t)(doc[F("HEATINGTIMED")] | 0) * 1000;
     _airtime_daily_ms = (uint32_t)(doc[F("AIRTIMED")] | 0) * 1000;
+    _jettime_daily_ms = (uint32_t)(doc[F("JETTIMED")] | 0) * 1000;
+    _uptime_daily_ms = (uint32_t)(doc[F("UPTIMED")] | 0) * 1000;
     _price = doc[F("PRICE")];
     _filter_replace_interval = doc[F("FREPI")] | _filter_replace_interval;
     _filter_rinse_interval = doc[F("FRINI")] | _filter_rinse_interval;
@@ -1683,6 +1705,8 @@ void BWC::saveSettings(){
     doc[F("PUMPTIMED")] = _pumptime_daily_ms / 1000;
     doc[F("HEATINGTIMED")] = _heatingtime_daily_ms / 1000;
     doc[F("AIRTIMED")] = _airtime_daily_ms / 1000;
+    doc[F("JETTIMED")] = _jettime_daily_ms / 1000;
+    doc[F("UPTIMED")] = _uptime_daily_ms / 1000;
     doc[F("JETTIME")] = _jettime;
     doc[F("PRICE")] = _price;
     doc[F("FREPI")] = _filter_replace_interval;

@@ -170,6 +170,7 @@ void loop()
                     mqttClient->setBufferSize(8192);
                     setupHA();
                     mqttClient->setBufferSize(512);
+                    mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/Status")).c_str(), "Alive", true);
                     mqttClient->loop();
                 }
             }
@@ -298,15 +299,18 @@ void sendMQTT()
 
     // send times
     json.clear();
+    json.reserve(1024);
     bwc->getJSONTimes(json);
+    mqttClient->setBufferSize(1280);
     if (mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/times")).c_str(), String(json).c_str(), true))
     {
-        BWC_LOG_P(PSTR("MQTT > times published\n"),0);
+        BWC_LOG_P(PSTR("MQTT > times published (len=%d)\n"), json.length());
     }
     else
     {
-        BWC_LOG_P(PSTR("MQTT > times not published\n"),0);
+        BWC_LOG_P(PSTR("MQTT > times not published (len=%d)\n"), json.length());
     }
+    mqttClient->setBufferSize(512);
 
     //send other info
     json.clear();

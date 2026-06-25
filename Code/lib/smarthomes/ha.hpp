@@ -405,44 +405,72 @@ void setupHA()
     cmp[_mymax] = 8;
     cmp["mode"] = F("slider");
 
-    cmp = createComponent(cmps, "pumptime", "sensor", F("Pump time"));
+    cmp = createComponent(cmps, "pumptime", "sensor", F("Pump time"), false);
     cmp[_stat_t] = topicTimes;
     cmp[_val_tpl] = F("{{ ( (value_json.PUMPTIME|int)/3600) | round(2) }}");
     cmp[_unit_of_meas] = F("hours");
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:clock-outline");
 
-    cmp = createComponent(cmps, "pumptime_today", "sensor", F("Pump time today"));
+    cmp = createComponent(cmps, "pumptime_today", "sensor", F("Pump time today"), false);
     cmp[_stat_t] = topicTimes;
     cmp[_val_tpl] = F("{{ ( (value_json.PUMPTIMED|int)/3600) | round(2) }}");
     cmp[_unit_of_meas] = F("hours");
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:clock-outline");
 
-    cmp = createComponent(cmps, "heatertime", "sensor", F("Heater time"));
+    cmp = createComponent(cmps, "heatertime", "sensor", F("Heater time"), false);
     cmp[_stat_t] = topicTimes;
     cmp[_val_tpl] = F("{{ ( (value_json.HEATINGTIME|int)/3600) | round(2) }}");
     cmp[_unit_of_meas] = F("hours");
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:clock-outline");
 
-    cmp = createComponent(cmps, "heatertime_today", "sensor", F("Heater time today"));
+    cmp = createComponent(cmps, "heatertime_today", "sensor", F("Heater time today"), false);
     cmp[_stat_t] = topicTimes;
     cmp[_val_tpl] = F("{{ ( (value_json.HEATINGTIMED|int)/3600) | round(2) }}");
     cmp[_unit_of_meas] = F("hours");
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:clock-outline");
 
-    cmp = createComponent(cmps, "airtime", "sensor", F("Air time"));
+    cmp = createComponent(cmps, "airtime", "sensor", F("Air time"), false);
     cmp[_stat_t] = topicTimes;
     cmp[_val_tpl] = F("{{ ( (value_json.AIRTIME|int)/3600) | round(2) }}");
     cmp[_unit_of_meas] = F("hours");
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:clock-outline");
 
-    cmp = createComponent(cmps, "airtime_today", "sensor", F("Air time today"));
+    cmp = createComponent(cmps, "airtime_today", "sensor", F("Air time today"), false);
     cmp[_stat_t] = topicTimes;
     cmp[_val_tpl] = F("{{ ( (value_json.AIRTIMED|int)/3600) | round(2) }}");
+    cmp[_unit_of_meas] = F("hours");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:clock-outline");
+
+    cmp = createComponent(cmps, "jettime", "sensor", F("Jet time"), false);
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ ( (value_json.JETTIME|int)/3600) | round(2) }}");
+    cmp[_unit_of_meas] = F("hours");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:clock-outline");
+
+    cmp = createComponent(cmps, "jettime_today", "sensor", F("Jet time today"), false);
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ ( (value_json.JETTIMED|int)/3600) | round(2) }}");
+    cmp[_unit_of_meas] = F("hours");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:clock-outline");
+
+    cmp = createComponent(cmps, "idletime", "sensor", F("Idle time"), false);
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ ( (value_json.UPTIME|int)/3600) | round(2) }}");
+    cmp[_unit_of_meas] = F("hours");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:clock-outline");
+
+    cmp = createComponent(cmps, "idletime_today", "sensor", F("Idle time today"), false);
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ ( (value_json.UPTIMED|int)/3600) | round(2) }}");
     cmp[_unit_of_meas] = F("hours");
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:clock-outline");
@@ -636,6 +664,96 @@ void setupHA()
     cmp["stat_cla"] = F("measurement");
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:flash");
+
+    cmp = createComponent(cmps, "power_pump", "sensor", F("Power pump"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.WATT_PUMP | int }}");
+    cmp[_unit_of_meas] = F("W");
+    cmp[_dev_cla] = F("power");
+    cmp["stat_cla"] = F("measurement");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:pump");
+
+    cmp = createComponent(cmps, "power_heater", "sensor", F("Power heater"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.WATT_HEAT | int }}");
+    cmp[_unit_of_meas] = F("W");
+    cmp[_dev_cla] = F("power");
+    cmp["stat_cla"] = F("measurement");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:radiator");
+
+    cmp = createComponent(cmps, "power_air", "sensor", F("Power air"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.WATT_AIR | int }}");
+    cmp[_unit_of_meas] = F("W");
+    cmp[_dev_cla] = F("power");
+    cmp["stat_cla"] = F("measurement");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:chart-bubble");
+
+    cmp = createComponent(cmps, "energy_pump", "sensor", F("Energy pump"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWH_PUMP | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:pump");
+
+    cmp = createComponent(cmps, "energy_heater", "sensor", F("Energy heater"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWH_HEAT | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:radiator");
+
+    cmp = createComponent(cmps, "energy_air", "sensor", F("Energy air"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWH_AIR | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:chart-bubble");
+
+    cmp = createComponent(cmps, "power_jet", "sensor", F("Power jets"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.WATT_JET | int }}");
+    cmp[_unit_of_meas] = F("W");
+    cmp[_dev_cla] = F("power");
+    cmp["stat_cla"] = F("measurement");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:hydro-power");
+
+    cmp = createComponent(cmps, "energy_jet", "sensor", F("Energy jets"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWH_JET | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:hydro-power");
+
+    cmp = createComponent(cmps, "power_idle", "sensor", F("Power idle"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.WATT_IDLE | int }}");
+    cmp[_unit_of_meas] = F("W");
+    cmp[_dev_cla] = F("power");
+    cmp["stat_cla"] = F("measurement");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:power-sleep");
+
+    cmp = createComponent(cmps, "energy_idle", "sensor", F("Energy idle"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWH_IDLE | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:power-sleep");
 
     cmp = createComponent(cmps, "energy", "sensor", F("Energy"));
     cmp[_stat_t] = topicTimes;
