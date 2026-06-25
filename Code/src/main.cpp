@@ -156,6 +156,23 @@ void loop()
                 send_mqtt_cfg_needed = false;
                 sendMQTTConfig();
             }
+            // Send HA discovery 5s after each (re)connect for connection stability
+            static int ha_sent_for_count = 0;
+            static unsigned long ha_pending_since = 0;
+            if (ha_sent_for_count < mqtt_connect_count)
+            {
+                if (ha_pending_since == 0) ha_pending_since = millis();
+                if (millis() - ha_pending_since >= 5000UL)
+                {
+                    ha_pending_since = 0;
+                    ha_sent_for_count = mqtt_connect_count;
+                    BWC_LOG_P(PSTR("MQTT > Sending HA discovery\n"),0);
+                    mqttClient->setBufferSize(8192);
+                    setupHA();
+                    mqttClient->setBufferSize(512);
+                    mqttClient->loop();
+                }
+            }
         }
 
         if(checkNTP_flag)
@@ -1892,12 +1909,19 @@ void mqttConnect()
     {
         return;
     }
+    String mqttClientId = mqtt_info->mqttClientId;
+    if (mqttClientId.isEmpty())
+    {
+        mqttClientId = String(DEVICE_NAME) + "_" + String(ESP.getChipId(), HEX);
+        BWC_LOG_P(PSTR("MQTT > Client ID auto: %s\n"), mqttClientId.c_str());
+    }
+
     BWC_LOG_P(PSTR("MQTT > connecting\n"),0);
 
     // Serial.print(F("MQTT > Connecting ... "));
     // We'll connect with a Retained Last Will that updates the 'Status' topic with "Dead" when the device goes offline...
     if (mqttClient->connect(
-        mqtt_info->mqttClientId.c_str(), // client_id : the client ID to use when connecting to the server->
+        mqttClientId.c_str(), // client_id : the client ID to use when connecting to the server->
         mqtt_info->mqttUsername.c_str(), // username : the username to use. If NULL, no username or password is used (const char[])
         mqtt_info->mqttPassword.c_str(), // password : the password to use. If NULL, no password is used (const char[])setupHA
         (String(mqtt_info->mqttBaseTopic) + F("/Status")).c_str(), // willTopic : the topic to be used by the will message (const char[])
@@ -1939,17 +1963,15 @@ void mqttConnect()
         mqttClient->setBufferSize(8192);
         setupHA();
         mqttClient->setBufferSize(512);
+        sendMQTT();
         mqttClient->loop();
-        // Serial.println(F("MQTT Sending config"));
-        // sendMQTTConfig();    // Stack smashing if doing this here :-(
         send_mqtt_cfg_needed = true;
         BWC_LOG_P(PSTR("MQTT > connect done\n"),0);
         #endif
     }
     else
     {
-        // Serial.print(F("failed, Return Code = "));
-        // Serial.println(mqttClient->state()); // states explained in webSocket->js
+        BWC_LOG_P(PSTR("MQTT > connect failed, state=%d\n"), mqttClient->state());
     }
     BWC_YIELD;
 }
