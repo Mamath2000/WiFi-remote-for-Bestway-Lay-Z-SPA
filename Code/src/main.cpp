@@ -1957,11 +1957,6 @@ void mqttConnect()
         bwc->getButtonName(buttonname);
         mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/button")).c_str(), buttonname.c_str(), true);
         mqttClient->loop();
-        sendMQTT();
-        BWC_LOG_P(PSTR("MQTT > Sending HA discovery"),0);
-        // Increase buffer to accommodate larger HA discovery payloads with long-form keys
-        mqttClient->setBufferSize(8192);
-        setupHA();
         mqttClient->setBufferSize(512);
         sendMQTT();
         mqttClient->loop();
