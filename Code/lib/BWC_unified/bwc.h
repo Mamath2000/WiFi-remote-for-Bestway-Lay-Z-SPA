@@ -149,6 +149,9 @@ class BWC {
         uint32_t _heatingtime_ms;
         uint32_t _airtime_ms;
         uint32_t _jettime_ms;
+        uint32_t _pumptime_daily_ms;
+        uint32_t _heatingtime_daily_ms;
+        uint32_t _airtime_daily_ms;
         uint32_t _filter_rinse_interval;
         uint32_t _filter_clean_interval;
         uint32_t _filter_replace_interval;

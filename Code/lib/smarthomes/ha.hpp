@@ -412,6 +412,13 @@ void setupHA()
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:clock-outline");
 
+    cmp = createComponent(cmps, "pumptime_today", "sensor", F("Pump time today"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ ( (value_json.PUMPTIMED|int)/3600) | round(2) }}");
+    cmp[_unit_of_meas] = F("hours");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:clock-outline");
+
     cmp = createComponent(cmps, "heatertime", "sensor", F("Heater time"));
     cmp[_stat_t] = topicTimes;
     cmp[_val_tpl] = F("{{ ( (value_json.HEATINGTIME|int)/3600) | round(2) }}");
@@ -419,9 +426,23 @@ void setupHA()
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:clock-outline");
 
+    cmp = createComponent(cmps, "heatertime_today", "sensor", F("Heater time today"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ ( (value_json.HEATINGTIMED|int)/3600) | round(2) }}");
+    cmp[_unit_of_meas] = F("hours");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:clock-outline");
+
     cmp = createComponent(cmps, "airtime", "sensor", F("Air time"));
     cmp[_stat_t] = topicTimes;
     cmp[_val_tpl] = F("{{ ( (value_json.AIRTIME|int)/3600) | round(2) }}");
+    cmp[_unit_of_meas] = F("hours");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:clock-outline");
+
+    cmp = createComponent(cmps, "airtime_today", "sensor", F("Air time today"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ ( (value_json.AIRTIMED|int)/3600) | round(2) }}");
     cmp[_unit_of_meas] = F("hours");
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:clock-outline");

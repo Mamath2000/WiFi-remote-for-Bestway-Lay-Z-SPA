@@ -17,6 +17,9 @@ BWC::BWC()
     _heatingtime = 0;
     _airtime = 0;
     _jettime = 0;
+    _pumptime_daily_ms = 0;
+    _heatingtime_daily_ms = 0;
+    _airtime_daily_ms = 0;
     _price = 1.0;
     _filter_rinse_interval = 7;
     _filter_clean_interval = 20;
@@ -509,6 +512,9 @@ bool BWC::_handlecommand(Commands cmd, int64_t val, const String& txt="")
         _energy_daily_Ws = 0;
         _energy_cost_total = 0;
         _energy_cost_daily = 0;
+        _pumptime_daily_ms = 0;
+        _heatingtime_daily_ms = 0;
+        _airtime_daily_ms = 0;
         _save_settings_needed = true;
         _new_data_available = true;
         break;
@@ -557,6 +563,9 @@ bool BWC::_handlecommand(Commands cmd, int64_t val, const String& txt="")
         break;
     case RESETDAILY:
         _energy_daily_Ws = 0;
+        _pumptime_daily_ms = 0;
+        _heatingtime_daily_ms = 0;
+        _airtime_daily_ms = 0;
         _new_data_available = true;
         break;
     case SETGODMODE:
@@ -1066,6 +1075,9 @@ void BWC::getJSONTimes(String &rtn) {
     doc[F("PUMPTIME")] = _pumptime + _pumptime_ms/1000;
     doc[F("HEATINGTIME")] = _heatingtime + _heatingtime_ms/1000;
     doc[F("AIRTIME")] = _airtime + _airtime_ms/1000;
+    doc[F("PUMPTIMED")] = _pumptime_daily_ms / 1000;
+    doc[F("HEATINGTIMED")] = _heatingtime_daily_ms / 1000;
+    doc[F("AIRTIMED")] = _airtime_daily_ms / 1000;
     doc[F("JETTIME")] = _jettime + _jettime_ms/1000;
     doc[F("COST")] = _energy_cost_total;
     doc[F("COSTD")] = _energy_cost_daily;
@@ -1244,12 +1256,15 @@ void BWC::_updateTimes(){
     if (elapsedtime_ms < 0) return; //millis() rollover every 24,8 days
     if(cio->cio_states.heatred){
         _heatingtime_ms += elapsedtime_ms;
+        _heatingtime_daily_ms += elapsedtime_ms;
     }
     if(cio->cio_states.pump){
         _pumptime_ms += elapsedtime_ms;
+        _pumptime_daily_ms += elapsedtime_ms;
     }
     if(cio->cio_states.bubbles){
         _airtime_ms += elapsedtime_ms;
+        _airtime_daily_ms += elapsedtime_ms;
     }
     if(cio->cio_states.jets){
         _jettime_ms += elapsedtime_ms;
@@ -1400,6 +1415,9 @@ void BWC::_loadSettings(){
     _heatingtime = doc[F("HEATINGTIME")];
     _airtime = doc[F("AIRTIME")];
     _jettime = doc[F("JETTIME")];
+    _pumptime_daily_ms = (uint32_t)(doc[F("PUMPTIMED")] | 0) * 1000;
+    _heatingtime_daily_ms = (uint32_t)(doc[F("HEATINGTIMED")] | 0) * 1000;
+    _airtime_daily_ms = (uint32_t)(doc[F("AIRTIMED")] | 0) * 1000;
     _price = doc[F("PRICE")];
     _filter_replace_interval = doc[F("FREPI")] | _filter_replace_interval;
     _filter_rinse_interval = doc[F("FRINI")] | _filter_rinse_interval;
@@ -1662,6 +1680,9 @@ void BWC::saveSettings(){
     doc[F("PUMPTIME")] = _pumptime;
     doc[F("HEATINGTIME")] = _heatingtime;
     doc[F("AIRTIME")] = _airtime;
+    doc[F("PUMPTIMED")] = _pumptime_daily_ms / 1000;
+    doc[F("HEATINGTIMED")] = _heatingtime_daily_ms / 1000;
+    doc[F("AIRTIMED")] = _airtime_daily_ms / 1000;
     doc[F("JETTIME")] = _jettime;
     doc[F("PRICE")] = _price;
     doc[F("FREPI")] = _filter_replace_interval;
