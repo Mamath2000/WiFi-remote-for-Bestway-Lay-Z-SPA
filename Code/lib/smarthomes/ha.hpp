@@ -495,6 +495,15 @@ void setupHA()
     cmp["stat_on"] = true;
     cmp["stat_off"] = false;
 
+    if (!publishGroup(groupDoc, "control"))
+    {
+        return;
+    }
+
+
+    initGroup(groupDoc, mychipid + F("_control_adv"), baseName + F(" Commandes Avancées"), false);
+    cmps = groupDoc.createNestedObject("cmps");
+
     cmp = createComponent(cmps, "vtcal", "binary_sensor", F("VTCAL"), false);
     cmp[_stat_t] = topicGetConfig;
     cmp[_val_tpl] = F("{% if value_json.VTCAL == 1 %}OFF{% else %}ON{% endif %}");
@@ -590,7 +599,7 @@ void setupHA()
     cmp["stat_off"] = false;
 
 
-    if (!publishGroup(groupDoc, "control"))
+    if (!publishGroup(groupDoc, "_control_adv"))
     {
         return;
     }
