@@ -773,6 +773,51 @@ void setupHA()
     cmp["exp_aft"] = defaultExpire;
     cmp["ic"] = F("mdi:flash");
 
+    cmp = createComponent(cmps, "energy_pump_today", "sensor", F("Energy pump today"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWHD_PUMP | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:pump");
+
+    cmp = createComponent(cmps, "energy_heater_today", "sensor", F("Energy heater today"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWHD_HEAT | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:radiator");
+
+    cmp = createComponent(cmps, "energy_air_today", "sensor", F("Energy air today"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWHD_AIR | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:chart-bubble");
+
+    cmp = createComponent(cmps, "energy_jet_today", "sensor", F("Energy jets today"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWHD_JET | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:hydro-power");
+
+    cmp = createComponent(cmps, "energy_idle_today", "sensor", F("Energy idle today"));
+    cmp[_stat_t] = topicTimes;
+    cmp[_val_tpl] = F("{{ value_json.KWHD_IDLE | round(3) }}");
+    cmp[_unit_of_meas] = F("kWh");
+    cmp[_dev_cla] = F("energy");
+    cmp["stat_cla"] = F("total_increasing");
+    cmp["exp_aft"] = defaultExpire;
+    cmp["ic"] = F("mdi:power-sleep");
+
     cmp = createComponent(cmps, "cost", "sensor", F("Energy cost"));
     cmp[_stat_t] = topicTimes;
     cmp[_val_tpl] = F("{{ value_json.COST | round(3) }}");

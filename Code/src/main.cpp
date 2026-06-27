@@ -299,9 +299,9 @@ void sendMQTT()
 
     // send times
     json.clear();
-    json.reserve(1024);
+    json.reserve(1280);
     bwc->getJSONTimes(json);
-    mqttClient->setBufferSize(1280);
+    mqttClient->setBufferSize(1536);
     if (mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/times")).c_str(), String(json).c_str(), true))
     {
         BWC_LOG_P(PSTR("MQTT > times published (len=%d)\n"), json.length());

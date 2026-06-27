@@ -22,6 +22,7 @@ BWC::BWC()
     _airtime_daily_ms = 0;
     _jettime_daily_ms = 0;
     _uptime_daily_ms = 0;
+    _last_reset_day = 0;
     _price = 1.0;
     _filter_rinse_interval = 7;
     _filter_clean_interval = 20;
@@ -567,9 +568,13 @@ bool BWC::_handlecommand(Commands cmd, int64_t val, const String& txt="")
         break;
     case RESETDAILY:
         _energy_daily_Ws = 0;
+        _energy_cost_daily = 0;
         _pumptime_daily_ms = 0;
         _heatingtime_daily_ms = 0;
         _airtime_daily_ms = 0;
+        _jettime_daily_ms = 0;
+        _uptime_daily_ms = 0;
+        _last_reset_day = _timestamp_secs / 86400;
         _new_data_available = true;
         break;
     case SETGODMODE:
@@ -1066,7 +1071,7 @@ void BWC::getJSONTimes(String &rtn) {
     #ifdef ESP8266
     ESP.wdtFeed();
     #endif
-    DynamicJsonDocument doc(1536);
+    DynamicJsonDocument doc(2048);
 
     // Set the values in the document
     doc[F("CONTENT")] = F("TIMES");
@@ -1106,6 +1111,11 @@ void BWC::getJSONTimes(String &rtn) {
     doc[F("KWH_AIR")]  = (_airtime     + _airtime_ms/1000)     * (double)pl.AIRPOWER   / 3600000.0;
     doc[F("KWH_JET")]  = (_jettime     + _jettime_ms/1000)     * (double)pl.JETPOWER   / 3600000.0;
     doc[F("KWH_IDLE")] = (_uptime      + _uptime_ms/1000)      * (double)pl.IDLEPOWER  / 3600000.0;
+    doc[F("KWHD_PUMP")] = _pumptime_daily_ms    / 1000.0 * (double)pl.PUMPPOWER  / 3600000.0;
+    doc[F("KWHD_HEAT")] = _heatingtime_daily_ms / 1000.0 * (double)heaterPwr     / 3600000.0;
+    doc[F("KWHD_AIR")]  = _airtime_daily_ms     / 1000.0 * (double)pl.AIRPOWER   / 3600000.0;
+    doc[F("KWHD_JET")]  = _jettime_daily_ms     / 1000.0 * (double)pl.JETPOWER   / 3600000.0;
+    doc[F("KWHD_IDLE")] = _uptime_daily_ms      / 1000.0 * (double)pl.IDLEPOWER  / 3600000.0;
     float t2r = _estHeatingTime();
     String t2r_string = F("Not ready");
     if(t2r == -2) t2r_string = F("Ready");
@@ -1270,6 +1280,25 @@ void BWC::_updateTimes(){
     //     cio->setStateAge(i, cio->getStateAge(i) + elapsedtime_ms);
     // }
     _virtual_temp_fix_age += elapsedtime_ms;
+
+    // Auto midnight reset (UTC day change)
+    if (_timestamp_secs > 86400) {
+        uint32_t current_day = _timestamp_secs / 86400;
+        if (_last_reset_day == 0) {
+            _last_reset_day = current_day;
+        } else if (current_day != _last_reset_day) {
+            _energy_daily_Ws = 0;
+            _energy_cost_daily = 0;
+            _pumptime_daily_ms = 0;
+            _heatingtime_daily_ms = 0;
+            _airtime_daily_ms = 0;
+            _jettime_daily_ms = 0;
+            _uptime_daily_ms = 0;
+            _last_reset_day = current_day;
+            _save_settings_needed = true;
+            _new_data_available = true;
+        }
+    }
 
     if (elapsedtime_ms < 0) return; //millis() rollover every 24,8 days
     if(cio->cio_states.heatred){
@@ -1454,6 +1483,7 @@ void BWC::_loadSettings(){
     _energy_daily_Ws *= 3600000; //kWh->Ws
     _energy_cost_total = doc[F("COST")];
     _energy_cost_daily = doc[F("COSTD")];
+    _last_reset_day = doc[F("LRDAY")] | (uint32_t)0;
     _restore_states_on_start = doc[F("RESTORE")];
     _R_COOLING = doc[F("R")] | 40.0f; //else use default
     _ambient_temp = doc[F("AMB")] | 20;
@@ -1682,7 +1712,7 @@ void BWC::saveSettings(){
         return;
     }
 
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(1280);
     _heatingtime += _heatingtime_ms/1000;
     _pumptime += _pumptime_ms/1000;
     _airtime += _airtime_ms/1000;
@@ -1718,6 +1748,7 @@ void BWC::saveSettings(){
     doc[F("KWHD")] = _energy_daily_Ws / 3600000; //Ws->kWh
     doc[F("COST")] = _energy_cost_total;
     doc[F("COSTD")] = _energy_cost_daily;
+    doc[F("LRDAY")] = _last_reset_day;
     // doc[F("SAVETIME")] = DateTime.format(DateFormatter::SIMPLE);
     doc[F("RESTORE")] = _restore_states_on_start;
     doc[F("R")] = _R_COOLING;
