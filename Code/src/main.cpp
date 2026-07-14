@@ -13,15 +13,24 @@ OneWire *oneWire;
 // Pass our oneWire reference to Dallas Temperature sensor 
 DallasTemperature *tempSensors;
 
+#ifdef ESP8266
 WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
 void cb_gotIP(const WiFiEventStationModeGotIP& event)
 {
     gotIP_flag = true;
 }
+#else
+void cb_gotIP(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+    gotIP_flag = true;
+}
+#endif
 
 void gotIP()
 {
+#ifdef ESP8266
     ESP.wdtFeed();
+#endif
     BWC_LOG_P(PSTR("start of gotip millis = %d\n"), millis());
     gotIP_flag = false;
     WiFi.softAPdisconnect();
@@ -35,11 +44,18 @@ void gotIP()
     BWC_YIELD;
 }
 
+#ifdef ESP8266
 void cb_disconnected(const WiFiEventStationModeDisconnected& event)
 {
     disconnected_flag = true;
     // startSoftAp();
 }
+#else
+void cb_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
+{
+    disconnected_flag = true;
+}
+#endif
 
 void setup()
 {
@@ -51,12 +67,19 @@ void setup()
     Serial.begin(76800);
     BWC_LOG_P(PSTR("\nSetup > Start @ millis: %d\n"),millis());
     /*register wifi events */
+#ifdef ESP8266
     gotIpEventHandler = WiFi.onStationModeGotIP(cb_gotIP);
     disconnectedEventHandler = WiFi.onStationModeDisconnected(cb_disconnected);
+#else
+    WiFi.onEvent(cb_gotIP, ARDUINO_EVENT_WIFI_STA_GOT_IP);
+    WiFi.onEvent(cb_disconnected, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+#endif
 
     LittleFS.begin();
     {
+        #ifdef ESP8266
         HeapSelectIram ephemeral;
+        #endif
         bwc = new BWC;
         oneWire = new OneWire(231);
         tempSensors = new DallasTemperature(oneWire);
@@ -93,8 +116,10 @@ void setup()
     startOTA();
     startMqtt();
     if(bwc->hasTempSensor)
-    { 
+    {
+        #ifdef ESP8266
         HeapSelectIram ephemeral;
+        #endif
         oneWire->begin(bwc->tempSensorPin);
         tempSensors->begin();
     }
@@ -205,7 +230,11 @@ void loop()
     {   
         resetWiFi();
         delay(3000);
+        #ifdef ESP8266
         ESP.reset();
+        #else
+        ESP.restart();
+        #endif
         delay(3000);
     }
 }
@@ -218,7 +247,9 @@ void sendWS()
 {
     if(!webSocket) return;
     if(webSocket->connectedClients() == 0) return;
+    #ifdef ESP8266
     HeapSelectIram ephemeral;
+    #endif
     // Serial.printf("IRamheap %d\n", ESP.getFreeHeap());
     // send states
     String json;
@@ -281,7 +312,9 @@ void getOtherInfo(String &rtn)
  */
 void sendMQTT()
 {
+    #ifdef ESP8266
     HeapSelectIram ephemeral;
+    #endif
     // Serial.printf("IRamheap %d\n", ESP.getFreeHeap());
     String json;
     json.reserve(320);
@@ -453,7 +486,7 @@ void checkNTP()
 void startNTP()
 {
     BWC_LOG_P(PSTR("NTP > start\n"),0);
-    configTime(0,0,wifi_info->ip4NTP_str, F("pool.ntp.org"), F("time.nist.gov"));
+    configTime(0, 0, wifi_info->ip4NTP_str.c_str(), "pool.ntp.org", "time.nist.gov");
     ntpCheck_ticker->attach(3.0, checkNTP_ISR);
 }
 
@@ -543,7 +576,9 @@ void pause_all(bool action)
 
 void startWebSocket()
 {
+    #ifdef ESP8266
     HeapSelectIram ephemeral;
+    #endif
     BWC_LOG_P(PSTR("WS > start. IRam heap: %d\n"), ESP.getFreeHeap());
     if(webSocket != nullptr)
     {
@@ -625,14 +660,19 @@ void startHttpServer()
     if(server != nullptr)
     {
         server->stop();
+        #ifdef ESP8266
         server->close();
+        #endif
         delete server;
         server = nullptr;
     }
 
     {
-        // HeapSelectIram ephemeral;
+        #ifdef ESP8266
         server = new ESP8266WebServer(80);
+        #else
+        server = new WebServer(80);
+        #endif
         /* if you want a simple auth you can do something like this for every page you want to "protect" */
         // server->on(F("/"), []() {
         //     if (!server->authenticate("user", "pswd")) {
@@ -683,7 +723,7 @@ void startHttpServer()
 void handleGetHardware()
 {
     if (!checkHttpPost(server->method())) return;
-    File file = LittleFS.open(F("hwcfg.json"), "r");
+    File file = LittleFS.open(F("/hwcfg.json"), "r");
     if (!file)
     {
         // Serial.println(F("Failed to open hwcfg.json"));
@@ -699,7 +739,7 @@ void handleSetHardware()
 {
     if (!checkHttpPost(server->method())) return;
     String message = server->arg(0);
-    File file = LittleFS.open(F("hwcfg.json"), "w");
+    File file = LittleFS.open(F("/hwcfg.json"), "w");
     if (!file)
     {
         // Serial.println(F("Failed to save hwcfg.json"));
@@ -1031,7 +1071,7 @@ void handleAddCommand()
     DeserializationError error = deserializeJson(doc, message);
     if (error)
     {
-        server->send(400, F("text/plain"), F("Error deserializing message: ")+message);
+        server->send(400, "text/plain", String("Error deserializing message: ") + message);
         return;
     }
 
@@ -1161,7 +1201,7 @@ void copyFile(String source, String dest)
     while (f_source.available() > 0)
     {
         byte i = f_source.readBytes(ibuffer, 64); // i = number of bytes placed in buffer from file f_source
-        f_dest.write(ibuffer, i);               // write i bytes from buffer to file f_dest
+        f_dest.write((const uint8_t*)ibuffer, i); // write i bytes from buffer to file f_dest
     }
     
     f_dest.close(); // done, close the destination file
@@ -1488,7 +1528,7 @@ void resetWiFi()
  */
 void loadMqtt()
 {
-    File file = LittleFS.open("mqtt.json", "r");
+    File file = LittleFS.open("/mqtt.json", "r");
     if (!file)
     {
         BWC_LOG_P(PSTR("MQTT > Failed to read mqtt.json. Using defaults.\n"),0);
@@ -1521,7 +1561,7 @@ void loadMqtt()
  */
 void saveMqtt()
 {
-    File file = LittleFS.open("mqtt.json", "w");
+    File file = LittleFS.open("/mqtt.json", "w");
     if (!file)
     {
         // Serial.println(F("Failed to save mqtt.json"));
@@ -1624,14 +1664,14 @@ void handleDir()
     mydir.reserve(128);
     server->setContentLength(CONTENT_LENGTH_UNKNOWN);
     server->send(200, F("text/html"), "");
+#ifdef ESP8266
     Dir root = LittleFS.openDir("/");
     while (root.next())
     {
-        // Serial.println(root.fileName());
         String href = root.fileName();
         if (href.endsWith(".gz")) href.remove(href.length()-3);
         mydir += F("<a href=\"/");
-        mydir +=href;
+        mydir += href;
         mydir += F("\">");
         mydir += root.fileName();
         mydir += F("</a>");
@@ -1644,6 +1684,32 @@ void handleDir()
         server->sendContent(mydir);
         mydir.clear();
     }
+#else
+    File root = LittleFS.open("/");
+    File entry = root.openNextFile();
+    while (entry)
+    {
+        String fileName = entry.name();
+        size_t fileSize = entry.size();
+        entry.close();
+        String href = fileName;
+        if (href.endsWith(".gz")) href.remove(href.length()-3);
+        mydir += "<a href=\"/";
+        mydir += href;
+        mydir += "\">";
+        mydir += fileName;
+        mydir += "</a>";
+        mydir += " Size: ";
+        mydir += String(fileSize);
+        mydir += " Bytes ";
+        mydir += " <a href=\"/remove/?FileToRemove=";
+        mydir += fileName;
+        mydir += "\">remove</a><br>";
+        server->sendContent(mydir);
+        mydir.clear();
+        entry = root.openNextFile();
+    }
+#endif
     server->sendContent("");
 }
 
@@ -1794,7 +1860,9 @@ void updateError(int err){
 void startMqtt()
 {
     {
+        #ifdef ESP8266
         HeapSelectIram ephemeral;
+        #endif
         BWC_LOG_P(PSTR("MQTT > start. Iram heap: %d\n"), ESP.getFreeHeap());
         if(!aWifiClient) aWifiClient = new WiFiClient;
         if(!mqttClient) mqttClient = new PubSubClient(*aWifiClient);
@@ -1916,7 +1984,11 @@ void mqttConnect()
     String mqttClientId = mqtt_info->mqttClientId;
     if (mqttClientId.isEmpty())
     {
+        #ifdef ESP8266
         mqttClientId = String(DEVICE_NAME) + "_" + String(ESP.getChipId(), HEX);
+        #else
+        mqttClientId = String(DEVICE_NAME) + "_" + String((uint32_t)(ESP.getEfuseMac() & 0xFFFFFF), HEX);
+        #endif
         BWC_LOG_P(PSTR("MQTT > Client ID auto: %s\n"), mqttClientId.c_str());
     }
 
@@ -2063,6 +2135,7 @@ void setTemperatureFromSensor()
     BWC_YIELD;
 }
 
+#ifdef ESP8266
 extern "C" void custom_crash_callback(struct rst_info * rst_info, uint32_t stack, uint32_t stack_end )
 {
     File file = LittleFS.open(F("crashlog.txt"), "a");
@@ -2146,6 +2219,7 @@ extern "C" void custom_crash_callback(struct rst_info * rst_info, uint32_t stack
     delay(3000);
     // ESP.restart();
 }
+#endif // ESP8266
 
 #include "ha.hpp"
 #include "prometheus.hpp"

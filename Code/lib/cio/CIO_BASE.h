@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include <optional>
 #include "enums.h"
 
 constexpr int MAXBUTTONS = 50;

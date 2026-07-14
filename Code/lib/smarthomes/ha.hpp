@@ -166,7 +166,7 @@ void setupHA()
     const int defaultExpire = 700;
     const String baseTopic = mqtt_info->mqttBaseTopic;
     const String baseName = mqtt_info->mqttBaseTopic;
-    const String configUrl = F("http://") + WiFi.localIP().toString();
+    const String configUrl = String("http://") + WiFi.localIP().toString();
     const String macAddress = WiFi.macAddress();
     const String topicStatus = baseTopic + F("/Status");
     const String topicMessage = baseTopic + F("/message");

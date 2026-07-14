@@ -1,8 +1,10 @@
 #pragma once
 #include <Arduino.h>
+#ifdef ESP8266
 #include <SoftwareSerial.h>
-#include "enums.h"
 #include <umm_malloc/umm_heap_select.h>
+#endif
+#include "enums.h"
 #include "CIO_BASE.h"
 
 class CIO_4W : public CIO
@@ -42,7 +44,11 @@ class CIO_4W : public CIO
         uint64_t _prev_ms;
         int _time_since_last_transmission_ms = 0;
         const int _max_time_between_transmissions_ms = 2000;
+        #ifdef ESP8266
         EspSoftwareSerial::UART *_cio_serial;
+        #else
+        HardwareSerial *_cio_serial;
+        #endif
         uint8_t _heat_bitmask = 0;
         uint8_t _from_CIO_buf[7] = {};
         uint8_t _to_CIO_buf[7] = {};

@@ -7,7 +7,7 @@
 void log2file(const char* s)
 {
     LittleFS.begin();
-    File file = LittleFS.open(F("debugoutput.txt"), "a");
+    File file = LittleFS.open(F("/debugoutput.txt"), "a");
     if (!file) {
         // Serial.println(F("Failed to save states.txt"));
         return;
