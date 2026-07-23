@@ -1460,7 +1460,7 @@ void BWC::_loadSettings(){
         // Serial.println(F("Failed to load settings.json"));
         return;
     }
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(1536);
 
     // Deserialize the JSON document
     DeserializationError error = deserializeJson(doc, file);
@@ -1728,7 +1728,7 @@ void BWC::saveSettings(){
         return;
     }
 
-    DynamicJsonDocument doc(1280);
+    DynamicJsonDocument doc(1536);
     _heatingtime += _heatingtime_ms/1000;
     _pumptime += _pumptime_ms/1000;
     _airtime += _airtime_ms/1000;
