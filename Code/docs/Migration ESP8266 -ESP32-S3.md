@@ -42,6 +42,16 @@ Le `platformio.ini` actuel contient l'environnement `env:esp32s3-zero` pour la c
 - ne propose que 4 Mo flash et 2 Mo PSRAM,
 - n'est pas le bon choix pour ce projet si l'on souhaite une antenne U.FL.
 
+### Caractéristiques techniques du module ESP32-S3-WROOM-1U
+
+- **CPU** : Xtensa LX7 dual-core @ 240 MHz (contre single-core @ 160 MHz sur l'ESP8266 d'origine),
+- **RAM interne** : 320 KB SRAM,
+- **PSRAM** : 8 Mo en mode **octal SPI** (plus rapide que le quad SPI du module `-zero`, mais mobilise davantage de GPIO réservés, voir ci-dessous),
+- **Flash** : 16 Mo QSPI,
+- **Connectivité** : WiFi 802.11 b/g/n + Bluetooth LE 5 (BLE non utilisé actuellement par le firmware),
+- **USB natif** : contrôleur USB-CDC intégré (GPIO19/20), utilisé ici uniquement pour la programmation/le moniteur série au premier flash,
+- **Empreinte mesurée du firmware actuel** (build `esp32s3-devkitc1u-n16r8`) : RAM 16,2 % (53 196 / 327 680 o), Flash 31,6 % (1 057 549 / 3 342 336 o) — large marge disponible pour la suite du portage.
+
 ## 3. Contraintes GPIO et broches réservées
 
 ### Broches réservées sur les modules octal flash/PSRAM
@@ -93,11 +103,9 @@ Configuration testée avec une **pompe 6 fils** (pré-2021 / 2021 air / 54149E).
 
 - **D0 / D8** : sonde de température DS18B20 (OneWire), non câblée dans cette version.
 
-## 5. Configuration PlatformIO recommandée
+## 5. Configuration PlatformIO (environnement `esp32s3-devkitc1u-n16r8`)
 
-Le repo contient déjà un env `esp32s3-zero`. Pour l’ESP32-S3 DevKitC-1U N16R8, ajoutez un environnement dédié.
-
-### Exemple d'environnement PlatformIO
+L'environnement dédié existe désormais dans `platformio.ini` (à côté de `esp32s3-zero`) :
 
 ```ini
 [env:esp32s3-devkitc1u-n16r8]
@@ -106,32 +114,112 @@ board = esp32-s3-devkitc-1
 framework = arduino
 board_build.filesystem = littlefs
 board_build.flash_size = 16MB
+board_build.partitions = default_8MB.csv
 board_build.psram = true
-build_flags =
-    -std=gnu++17
-    -DBOARD_HAS_PSRAM
-    -DFILTER_6W_SPIKES=1
-    -DBWC_DEBUGGING=BWC_DEBUG_OUTPUT_SERIAL
-    -DBWC_SPRINKLE_YIELDS
+build_unflags = -std=gnu++11 -std=gnu++14 -std=c++11 -std=c++14
+build_flags = 
+	-std=gnu++17
+	-DBOARD_HAS_PSRAM
+	-DFILTER_6W_SPIKES=1
+	-DBWC_DEBUGGING=BWC_DEBUG_OUTPUT_SERIAL
+	-DBWC_SPRINKLE_YIELDS
 upload_speed = 921600
 monitor_speed = 115200
 extra_scripts = gzip_littlefs.py
-lib_deps =
-    bblanchon/ArduinoJson@6.21.2
-    links2004/WebSockets
-    knolleary/PubSubClient
-    me-no-dev/AsyncTCP
-    plerup/EspSoftwareSerial
-    milesburton/DallasTemperature
+lib_deps = 
+	bblanchon/ArduinoJson@6.21.2
+	links2004/WebSockets@^2.7.3
+	knolleary/PubSubClient@^2.8.0
+	me-no-dev/AsyncTCP@^3.3.2
+	plerup/EspSoftwareSerial@^8.2.0
+	milesburton/DallasTemperature@^4.0.6
 upload_protocol = espota
 upload_port = 192.168.90.160
-upload_flags =
-    --auth=esp8266
+upload_flags = 
+	--auth=esp8266
 ```
 
-> Remarque : PlatformIO ne propose pas encore de board dédiée `esp32-s3-devkitc-1u-n16r8`. On utilise ici `esp32-s3-devkitc-1` comme base et on surcharge le flash/PSRAM.
+> Remarque : PlatformIO ne propose pas de board dédiée `esp32-s3-devkitc-1u-n16r8`. On utilise ici `esp32-s3-devkitc-1` comme base et on surcharge flash/PSRAM/partitions.
 
-## 6. Configuration de l’interface web
+> ⚠️ **Table de partitions et flash 16 Mo** : `default_8MB.csv` ne décrit que les 8 premiers Mo (jusqu'à l'offset `0x800000`). Sur cette carte qui a **16 Mo** de flash, la seconde moitié n'est donc pas adressée par la table de partitions actuelle. Ce n'est pas bloquant vu la marge mesurée (Flash utilisée à 31,6 % sur 8 Mo), mais si vous voulez exploiter les 16 Mo (LittleFS plus grand, double OTA plus confortable...), il faudra passer à `default_16MB.csv` ou une table sur mesure — à valider avant de changer, car cela modifie le layout flash existant.
+
+## 6. Installation et compilation
+
+### 6.1 Prérequis
+
+- Python 3
+- PlatformIO Core (CLI), installé soit via `pip`/`pipx`, soit via l'extension VS Code **PlatformIO IDE** (qui crée son propre venv dans `~/.platformio/penv`)
+
+### 6.2 Vérifier/installer PlatformIO Core
+
+```bash
+# si installé via pip
+pip install --user platformio
+pio --version
+
+# si installé via l'extension VS Code (venv dédié)
+~/.platformio/penv/bin/pio --version
+```
+
+> Si `pio` n'est pas dans le `PATH` (cas fréquent avec l'installation via l'extension VS Code), utilisez le binaire complet `~/.platformio/penv/bin/pio`, ou ajoutez-le au `PATH` :
+> ```bash
+> export PATH="$HOME/.platformio/penv/bin:$PATH"
+> ```
+
+### 6.3 Compiler pour l'ESP32-S3 DevKitC-1U N16R8
+
+Depuis le dossier `Code/` (celui qui contient `platformio.ini`) :
+
+```bash
+cd Code
+pio run -e esp32s3-devkitc1u-n16r8
+```
+
+Au premier lancement, PlatformIO télécharge automatiquement :
+- la plateforme `espressif32` et la toolchain `xtensa-esp32s3`,
+- les librairies listées dans `lib_deps` (ArduinoJson, WebSockets, PubSubClient, AsyncTCP, EspSoftwareSerial, DallasTemperature).
+
+### 6.4 Problème connu : module Python `intelhex` manquant
+
+Sur une installation fraîche, la génération du bootloader peut échouer avec :
+
+```
+ModuleNotFoundError: No module named 'intelhex'
+```
+
+C'est une dépendance de `esptool` absente par défaut du venv PlatformIO. Correction :
+
+```bash
+~/.platformio/penv/bin/python -m pip install intelhex
+```
+
+(adapter le chemin du venv si PlatformIO est installé autrement, ex. `pipx` ou venv perso).
+
+### 6.5 Résultat attendu
+
+```
+RAM:   [==        ]  16.2% (used 53196 bytes from 327680 bytes)
+Flash: [===       ]  31.6% (used 1057549 bytes from 3342336 bytes)
+========================= [SUCCESS] =========================
+```
+
+Le binaire final est généré dans `.pio/build/esp32s3-devkitc1u-n16r8/firmware.bin`.
+
+### 6.6 Flasher la carte
+
+- **Premier flash (USB-C)** :
+  ```bash
+  pio run -e esp32s3-devkitc1u-n16r8 -t upload --upload-port /dev/ttyUSB0
+  ```
+  (adapter le port : `/dev/ttyACM0` sous Linux selon l'énumération USB-CDC, `COM3` sous Windows, etc. — nécessaire uniquement pour ce premier flash, tant que le firmware WiFi/OTA n'est pas encore actif sur la carte.)
+
+- **Mises à jour OTA** (une fois le firmware actif sur le réseau) — l'environnement est préconfiguré pour l'upload OTA :
+  ```bash
+  pio run -e esp32s3-devkitc1u-n16r8 -t upload
+  ```
+  Utilise `upload_port = 192.168.90.160` et `--auth=esp8266` définis dans `platformio.ini`. **Adaptez l'IP à votre carte.**
+
+## 7. Configuration de l’interface web
 
 Dans le menu **Hardware Config** du firmware, utilisez :
 
@@ -139,7 +227,7 @@ Dans le menu **Hardware Config** du firmware, utilisez :
 - **PCB** : **Custom**,
 - **Pins** : `pin1=4, pin2=5, pin3=6, pin4=7, pin5=15, pin6=16, pin7=17, pin8=`.
 
-## 7. Sources officielles et ressources
+## 8. Sources officielles et ressources
 
 - Documentation officielle ESP32-S3 DevKitC-1 : https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide_v1.1.html
 - Module ESP32-S3-WROOM-1U datasheet : [ESP32-S3-WROOM-1 / WROOM-1U datasheet](./reference/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf)
@@ -148,7 +236,7 @@ Dans le menu **Hardware Config** du firmware, utilisez :
 
 ![ESP32-S3 DevKitC-1 pinout](./images/ESP32-S3_DevKitC-1_pinlayout_v1.1.jpg)
 
-## 8. Notes complémentaires
+## 9. Notes complémentaires
 
 - Vérifiez toujours la référence exacte **`ESP32-S3-DevKitC-1U-N16R8`** et non `ESP32-S3-DevKitC-1-N16R8`.
 - Pour l’usage d’une antenne externe, la variante **-U** est impérative.
