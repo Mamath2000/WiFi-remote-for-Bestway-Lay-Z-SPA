@@ -678,6 +678,11 @@ void startHttpServer()
     {
         #ifdef ESP8266
         server = new ESP8266WebServer(80);
+        // ESP8266WebServer leaves Nagle's algorithm on by default (unlike ESP32's
+        // WebServer, which enables TCP_NODELAY internally in begin()) — each small
+        // HTTP response can incur extra latency. Static asset-heavy pages (many
+        // small files per load) are the most affected.
+        WiFiClient::setDefaultNoDelay(true);
         #else
         server = new WebServer(80);
         #endif
