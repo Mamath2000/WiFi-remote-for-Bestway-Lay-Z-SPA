@@ -14,11 +14,7 @@
 #define PROM_NAMESPACE "layzspa"
 // #define PROM_NAMESPACE_F F("layzspa")
 #define OTA_PSWD_F F("esp8266")
-#ifdef ESP8266
 #define WM_AP_NAME_F String(F("Lay-Z-Spa-"))+String(ESP.getChipId())
-#else
-#define WM_AP_NAME_F String(F("Lay-Z-Spa-"))+String((uint32_t)(ESP.getEfuseMac() & 0xFFFFFF), HEX)
-#endif
 #define WM_AP_PASSWORD_F F("layzspam0dule")
 // MQTT defaults
 #define MQTT_HOST_F F("192.168.0.20")

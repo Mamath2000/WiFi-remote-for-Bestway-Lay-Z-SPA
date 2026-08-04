@@ -1,11 +1,9 @@
 #pragma once
 #include <Arduino.h>
-#ifdef ESP8266
 #include <SoftwareSerial.h>
-#include <umm_malloc/umm_heap_select.h>
-#endif
 #include "enums.h"
 #include "DSP_BASE.h"
+#include <umm_malloc/umm_heap_select.h>
 
 
 class DSP_4W : public DSP
@@ -18,11 +16,7 @@ class DSP_4W : public DSP
         void pause_all(bool action) override;
         void updateToggles();
         void handleStates();
-        #ifdef ESP8266
         EspSoftwareSerial::UART *_dsp_serial;
-        #else
-        HardwareSerial *_dsp_serial;
-        #endif
         bool getSerialReceived() override;
         void setSerialReceived(bool txok) override;
   

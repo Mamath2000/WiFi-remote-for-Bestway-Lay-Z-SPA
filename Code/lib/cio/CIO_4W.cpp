@@ -8,14 +8,10 @@ void CIO_4W::setup(int cio_rx, int cio_tx, int dummy)
         Devices are sending on their TX lines, so we read that with RX pins on the ESP
         Hence the "backwards" parameters (cio_tx goes to ESP serial RX)
     */
-    #ifdef ESP8266
     HeapSelectIram ephemeral;
     _cio_serial = new EspSoftwareSerial::UART;
+
     _cio_serial->begin(9600, SWSERIAL_8N1, cio_tx, cio_rx, false, 24);
-    #else
-    _cio_serial = &Serial2;
-    _cio_serial->begin(9600, SERIAL_8N1, cio_tx, cio_rx);
-    #endif
     _cio_serial->setTimeout(20);
     cio_states.target = 20;
     cio_states.locked = false;
@@ -31,18 +27,13 @@ void CIO_4W::setup(int cio_rx, int cio_tx, int dummy)
 
 void CIO_4W::stop()
 {
-    #ifdef ESP8266
     _cio_serial->stopListening();
     delete _cio_serial;
-    #else
-    _cio_serial->end();
-    #endif
     _cio_serial = nullptr;
 }
 
 void CIO_4W::pause_all(bool action)
 {
-    #ifdef ESP8266
     if(action)
     {
         _cio_serial->stopListening();
@@ -50,8 +41,6 @@ void CIO_4W::pause_all(bool action)
     {
         _cio_serial->listen();
     }
-    #endif
-    // HardwareSerial sur ESP32 est toujours actif
 }
 
 void CIO_4W::handleToggles()

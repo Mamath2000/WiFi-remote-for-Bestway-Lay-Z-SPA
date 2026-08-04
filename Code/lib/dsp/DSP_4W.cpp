@@ -3,14 +3,9 @@
 
 void DSP_4W::setup(int dsp_tx, int dsp_rx, int dummy, int dummy2)
 {
-    #ifdef ESP8266
     HeapSelectIram ephemeral;
     _dsp_serial = new EspSoftwareSerial::UART;
     _dsp_serial->begin(9600, SWSERIAL_8N1, dsp_tx, dsp_rx, false, 24);
-    #else
-    _dsp_serial = &Serial1;
-    _dsp_serial->begin(9600, SERIAL_8N1, dsp_tx, dsp_rx);
-    #endif
     _dsp_serial->setTimeout(20);
     dsp_toggles.locked_pressed = 0;
     dsp_toggles.power_change = 0;
@@ -25,18 +20,13 @@ void DSP_4W::setup(int dsp_tx, int dsp_rx, int dummy, int dummy2)
 
 void DSP_4W::stop()
 {
-    #ifdef ESP8266
     _dsp_serial->stopListening();
     delete _dsp_serial;
-    #else
-    _dsp_serial->end();
-    #endif
     _dsp_serial = nullptr;
 }
 
 void DSP_4W::pause_all(bool action)
 {
-    #ifdef ESP8266
     if(action)
     {
         _dsp_serial->stopListening();
@@ -44,8 +34,6 @@ void DSP_4W::pause_all(bool action)
     {
         _dsp_serial->listen();
     }
-    #endif
-    // HardwareSerial sur ESP32 est toujours actif
 }
 
 void DSP_4W::updateToggles()

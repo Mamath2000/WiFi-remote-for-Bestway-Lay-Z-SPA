@@ -2,9 +2,6 @@
 #include "util.h"
 #include "pitches.h"
 #include <algorithm>
-#ifdef ESP8266
-#include <umm_malloc/umm_heap_select.h>
-#endif
 
 BWC::BWC()
 {
@@ -73,7 +70,6 @@ void BWC::setup(void){
     std::optional<Power> power_levels = {};
     
     if(!_loadHardware(ciomodel, dspmodel, pins, power_levels)){
-        #ifdef ESP8266
         pins[0] = D1;
         pins[1] = D2;
         pins[2] = D3;
@@ -82,17 +78,7 @@ void BWC::setup(void){
         pins[5] = D6;
         pins[6] = D7;
         pins[7] = D8;
-        #else
-        // Waveshare ESP32-S3-Zero — pins par défaut GPIO4-GPIO11
-        pins[0] = 4;   // CIO DATA / CIO RX
-        pins[1] = 5;   // CIO CLK  / CIO TX
-        pins[2] = 6;   // CIO CS
-        pins[3] = 7;   // DSP DATA / DSP TX
-        pins[4] = 8;   // DSP CLK  / DSP RX
-        pins[5] = 9;   // DSP CS
-        pins[6] = 10;  // AUDIO/PWM
-        pins[7] = 11;  // Sonde température (OneWire)
-        #endif
+        
     }
     // Serial.printf("Cio loaded: %d, dsp model: %d\n", ciomodel, dspmodel);
     for(int i = 0; i < 8; i++)
@@ -100,9 +86,7 @@ void BWC::setup(void){
         // Serial.printf("pin%d: %d\n", i, pins[i]);
     }
     {
-        #ifdef ESP8266
         HeapSelectIram ephemeral;
-        #endif
         switch(ciomodel)
         {
             case PRE2021:
@@ -270,7 +254,7 @@ void BWC::_log()
     prev_tocio = tocio;
     prev_todsp = todsp;
     
-    File file = LittleFS.open(F("/log.txt"), "a");
+    File file = LittleFS.open(F("log.txt"), "a");
     if (!file) {
         // Serial.println(F("Failed to save states.txt"));
         return;
@@ -1534,7 +1518,7 @@ void BWC::_loadSettings(){
 void BWC::restoreStates() {
     _states_are_restored = true;
     if(!_restore_states_on_start) return;
-    File file = LittleFS.open(F("/states.txt"), "r");
+    File file = LittleFS.open(F("states.txt"), "r");
     if (!file) {
         // Serial.println(F("Failed to read states.txt"));
         return;
@@ -1634,7 +1618,7 @@ void BWC::loadCommandQueue(){
 /*          */
 
 void BWC::saveRebootInfo(){
-    File file = LittleFS.open(F("/bootlog.txt"), "a");
+    File file = LittleFS.open(F("bootlog.txt"), "a");
     if (!file) {
         // Serial.println(F("Failed to save bootlog.txt"));
         return;
@@ -1661,7 +1645,7 @@ void BWC::_saveStates() {
     ESP.wdtFeed();
     #endif
     _save_states_needed = false;
-    File file = LittleFS.open(F("/states.txt"), "w");
+    File file = LittleFS.open(F("states.txt"), "w");
     if (!file) {
         // Serial.println(F("Failed to save states.txt"));
         return;
@@ -1692,7 +1676,7 @@ void BWC::_saveCommandQueue(){
     #ifdef ESP8266
     ESP.wdtFeed();
     #endif
-    File file = LittleFS.open(F("/cmdq.json"), "w");
+    File file = LittleFS.open(F("cmdq.json"), "w");
     if (!file) {
         BWC_LOG_P(PSTR("Failed to save cmdq.json\n"),0);
         return;
@@ -1732,7 +1716,7 @@ void BWC::saveSettings(){
     ESP.wdtFeed();
     #endif
     _save_settings_needed = false;
-    File file = LittleFS.open(F("/settings.json"), "w");
+    File file = LittleFS.open(F("settings.json"), "w");
     if (!file) {
         // Serial.println(F("Failed to save settings.json"));
         return;
@@ -1806,7 +1790,7 @@ void BWC::saveSettings(){
 
 //save out debug text to file "debug.txt" on littleFS
 void BWC::saveDebugInfo(const String& s){
-    File file = LittleFS.open(F("/debug.txt"), "a");
+    File file = LittleFS.open(F("debug.txt"), "a");
     if (!file) {
         // Serial.println(F("Failed to save debug.txt"));
         return;
@@ -1841,9 +1825,8 @@ bool BWC::_load_melody_json(const String& filename)
     if(_notes.size() || !_audio_enabled){
         // Serial.println("Q busy");
         return false;
-    }
-    String path = filename.startsWith("/") ? filename : "/" + filename;
-    File file = LittleFS.open(path, "r");
+    } 
+    File file = LittleFS.open(filename, "r");
     if (!file){
         // Serial.println("file error");
         return false; 

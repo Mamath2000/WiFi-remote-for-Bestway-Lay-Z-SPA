@@ -23,9 +23,7 @@
 #include <PubSubClient.h> // ** Requires library 2.8.0 or higher ** https://github.com/knolleary/pubsubclient
 #include <Ticker.h>
 #include <WebSocketsServer.h>
-#ifdef ESP8266
 #include <umm_malloc/umm_heap_select.h>
-#endif
 
 #include "bwc.h"
 #include "config.h"
@@ -61,7 +59,7 @@ File fsUploadFile;
 #if defined(ESP8266)
 ESP8266WebServer *server = nullptr;
 #elif defined(ESP32)
-WebServer *server = nullptr;
+WebServer server(80);
 #endif
 
 /** a websocket object that listens on port 81 */
@@ -84,14 +82,9 @@ bool prevunit = 1;
 /**  */
 bool firstNtpSyncAfterBoot = true;
 
-#ifdef ESP8266
 void cb_gotIP(const WiFiEventStationModeGotIP &event);
-void cb_disconnected(const WiFiEventStationModeDisconnected &event);
-#else
-void cb_gotIP(WiFiEvent_t event, WiFiEventInfo_t info);
-void cb_disconnected(WiFiEvent_t event, WiFiEventInfo_t info);
-#endif
 void gotIP();
+void cb_disconnected(const WiFiEventStationModeDisconnected &event);
 void sendWS();
 void getOtherInfo(String &rtn);
 void sendMQTT();

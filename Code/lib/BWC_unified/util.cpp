@@ -22,22 +22,36 @@ int gpio2dp(int gpio)
 
 int dp2gpio(int dp)
 {
-#ifdef ESP8266
     switch(dp)
     {
-        case D0: return D0;
-        case D1: return D1;
-        case D2: return D2;
-        case D3: return D3;
-        case D4: return D4;
-        case D5: return D5;
-        case D6: return D6;
-        case D7: return D7;
-        case D8: return D8;
-        default: return -1;
+        case D0:
+            return D0;
+            break;
+        case D1:
+            return D1;
+            break;
+        case D2:
+            return D2;
+            break;
+        case D3:
+            return D3;
+            break;
+        case D4:
+            return D4;
+            break;
+        case D5:
+            return D5;
+            break;
+        case D6:
+            return D6;
+            break;
+        case D7:
+            return D7;
+            break;
+        case D8:
+            return D8;
+            break;
+        default:
+            return -1;
     }
-#else
-    // Sur ESP32, les GPIO sont déjà des numéros directs — pas de mapping
-    return dp;
-#endif
 }
