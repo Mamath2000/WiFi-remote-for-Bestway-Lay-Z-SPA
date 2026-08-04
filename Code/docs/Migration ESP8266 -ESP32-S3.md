@@ -221,11 +221,24 @@ Le binaire final est généré dans `.pio/build/esp32s3-devkitc1u-n16r8/firmware
 
 ## 7. Configuration de l’interface web
 
-Dans le menu **Hardware Config** du firmware, utilisez :
+Dans le menu **Hardware Config** (`hwconfig.html`) du firmware :
 
 - **CIO / DSP** : sélectionnez le modèle 6 fils adapté à la pompe,
 - **PCB** : **Custom**,
-- **Pins** : `pin1=4, pin2=5, pin3=6, pin4=7, pin5=15, pin6=16, pin7=17, pin8=`.
+- **Pinout** : renseignez les champs ci-dessous, avec les valeurs de la colonne ESP32-S3.
+
+| Champ interface (id)        | Libellé UI     | Signal (§4)   | Valeur ESP32-S3 (GPIO brute) |
+|------------------------------|----------------|---------------|-------------------------------|
+| CIO → `pin1`                 | data/td/rx     | D1            | **4**                         |
+| CIO → `pin2`                 | clk/tx         | D2            | **5**                         |
+| CIO → `pin3`                 | cs/ld          | D5            | **6**                         |
+| DSP → `pin4`                 | data/td/tx     | D6            | **7**                         |
+| DSP → `pin5`                 | clk/rx         | D4            | **15**                        |
+| DSP → `pin6`                 | cs/ld          | D3            | **16**                        |
+| DSP → `pin7`                 | audio          | D7            | **17**                        |
+| Sonde température → `pin8`   | sensor pin     | D0/D8         | *(non câblé, laisser vide)*   |
+
+> ⚠️ **Ce champ ne signifie pas la même chose selon la cible.** Sur ESP8266, la valeur saisie est un **index D0-D8** (traduit en GPIO réelle via une table interne, `bwc.cpp` fonction `_loadHardware`). Sur ESP32, ce champ contient **directement le numéro de GPIO**, sans traduction. Ne recopiez donc jamais tel quel un jeu de valeurs `Pinout` vu sur un device ESP8266 vers un device ESP32 (ou inversement) — utilisez la table ci-dessus, qui donne les deux référentiels en regard.
 
 ## 8. Sources officielles et ressources
 
