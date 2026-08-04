@@ -420,15 +420,13 @@ void checkNTP_ISR()
 void checkNTP()
 {
     time_t now = time(nullptr);
-    // Before NTP sync, time(nullptr) free-runs from 0 at boot, in lockstep with
-    // uptime. Comparing it to a fixed threshold (the previous code used 16h)
-    // is unreliable: a device that has simply been up longer than that without
-    // ever reaching an NTP server also crosses it, which made getBootTime()
-    // below compute a bogus near-epoch boot time. Compare against uptime
-    // instead: once synced, now jumps to the real epoch (~1.7 billion),
-    // orders of magnitude above any plausible uptime.
-    if(now <= (time_t)(millis() / 1000))
+    // static uint8_t ntpTryNumber = 0;
+    if(now < 57600)
     {
+        // if (++ntpTryNumber == 10) {
+        //     ntpTryNumber = 0; //reset until next check
+        //     ntpCheck_ticker->detach(); //give up. Next check won't happen.
+        // }
         return;
     }
     ntpCheck_ticker->detach(); //time is set, don't check again
