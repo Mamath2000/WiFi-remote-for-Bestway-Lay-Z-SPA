@@ -190,9 +190,15 @@
     }
 
     function setPins() {
+        var pcb = document.querySelector("input[name='pcb']:checked").value
+
+        // Custom pins are user-entered and must never be overwritten by the
+        // presets below — this section is also wired to fire on every CIO/DSP
+        //  model click, so bail out before touching anything.
+        if (pcb === 'custom') return
+
         var cio = document.querySelector("input[name='cio_model']:checked").value
         var dsp = document.querySelector("input[name='dsp_model']:checked").value
-        var pcb = document.querySelector("input[name='pcb']:checked").value
         var p1, p2, p3, p4, p5, p6, p7, p8
         p8 = null
 
