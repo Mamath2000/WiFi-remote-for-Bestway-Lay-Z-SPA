@@ -988,8 +988,9 @@ bool handleFileRead(String path)
     }
     String contentType = getContentType(path);                  // Get the MIME type
     String pathWithGz = path + ".gz";
-    if (LittleFS.exists(pathWithGz) || LittleFS.exists(path)) { // If the file exists, either as a compressed archive, or normal
-        if (LittleFS.exists(pathWithGz))                        // If there's a compressed version available
+    bool hasGz = LittleFS.exists(pathWithGz);                    // Is there a compressed version available?
+    if (hasGz || LittleFS.exists(path)) {                        // If the file exists, either as a compressed archive, or normal
+        if (hasGz)
             path += ".gz";                                      // Use the compressed version
         File file = LittleFS.open(path, "r");                   // Open the file
         size_t fsize = file.size();
