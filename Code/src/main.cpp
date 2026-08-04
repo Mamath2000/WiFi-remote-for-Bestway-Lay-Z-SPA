@@ -440,14 +440,6 @@ void checkNTP()
     strftime(boot_time_str, 64, "%F %T", boot_time_tm);
     bwc->reboot_time_str = String(boot_time_str);
     bwc->reboot_time_t = boot_timestamp;
-    // mqttConnect() publishes /reboot_time right after the WiFi<->MQTT handshake,
-    // which usually happens before NTP has had time to sync (reboot_time_str is
-    // still empty at that point). Republish here, now that the real value is
-    // known, so the retained topic doesn't stay stuck on a bogus near-epoch date.
-    if (mqtt_info->useMqtt && mqttClient->connected())
-    {
-        mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/reboot_time")).c_str(), (bwc->reboot_time_str+'Z').c_str(), true);
-    }
     if(firstNtpSyncAfterBoot)
     {
         BWC_LOG_P(PSTR("NTP > synced: %s. Saving boot info.\n"),bwc->reboot_time_str.c_str());
@@ -1964,13 +1956,7 @@ void mqttConnect()
 
         #ifdef ESP8266
         // mqttClient->publish((String(mqttBaseTopic) + "/reboot_time").c_str(), DateTime.format(DateFormatter::SIMPLE).c_str(), true);
-        // Only publish if NTP already had time to sync (checkNTP() republishes
-        // it once it does) — avoids overwriting the retained topic with a
-        // meaningless "Z" (empty reboot_time_str) on most boots.
-        if (!bwc->reboot_time_str.isEmpty())
-        {
-            mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/reboot_time")).c_str(), (bwc->reboot_time_str+'Z').c_str(), true);
-        }
+        mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/reboot_time")).c_str(), (bwc->reboot_time_str+'Z').c_str(), true);
         mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/reboot_reason")).c_str(), ESP.getResetReason().c_str(), true);
         String buttonname;
         buttonname.reserve(32);
