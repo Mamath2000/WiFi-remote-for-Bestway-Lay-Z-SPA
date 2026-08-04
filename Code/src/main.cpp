@@ -999,6 +999,15 @@ bool handleFileRead(String path)
         File file = LittleFS.open(path, "r");                   // Open the file
         size_t fsize = file.size();
         BWC_YIELD;
+        // Static assets (html/css/js/icons) only change on a firmware reflash —
+        // let the browser skip re-fetching them on every page navigation.
+        // Excludes JSON: those aren't meant to be served from this generic path
+        // (dedicated endpoints handle config data), but better not cache them
+        // if they ever are.
+        if (contentType != F("application/json"))
+        {
+            server->sendHeader(F("Cache-Control"), F("max-age=3600"));
+        }
         size_t sent = server->streamFile(file, contentType);    // Send it to the client
         BWC_LOG_P(PSTR("File size: %d\n"),fsize);
         BWC_LOG_P(PSTR("HTTPServer > Filename: %s. Bytes sent: %d\n"),path.c_str(),sent);
