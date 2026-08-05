@@ -153,6 +153,29 @@ void setup()
 
     Serial.begin(76800);
     BWC_LOG_P(PSTR("\nSetup > Start @ millis: %d\n"),millis());
+    // Log the real reset cause (brownout/watchdog/panic/...) early, in plain ASCII,
+    // before WiFi/MQTT exist - useful even when a crash happens before MQTT logging
+    // (see bwcLog()) can come online.
+#ifndef ESP8266
+    {
+        esp_reset_reason_t r = esp_reset_reason();
+        const char *reason = "UNKNOWN";
+        switch (r) {
+            case ESP_RST_POWERON:   reason = "POWERON"; break;
+            case ESP_RST_EXT:       reason = "EXT_RESET"; break;
+            case ESP_RST_SW:        reason = "SW_RESET (esp_restart)"; break;
+            case ESP_RST_PANIC:     reason = "PANIC"; break;
+            case ESP_RST_INT_WDT:   reason = "INT_WDT"; break;
+            case ESP_RST_TASK_WDT:  reason = "TASK_WDT"; break;
+            case ESP_RST_WDT:       reason = "OTHER_WDT"; break;
+            case ESP_RST_DEEPSLEEP: reason = "DEEPSLEEP"; break;
+            case ESP_RST_BROWNOUT:  reason = "BROWNOUT"; break;
+            case ESP_RST_SDIO:      reason = "SDIO"; break;
+            default: break;
+        }
+        BWC_LOG_P(PSTR("Reset reason: %d (%s)\n"), (int)r, reason);
+    }
+#endif
     /*register wifi events */
 #ifdef ESP8266
     gotIpEventHandler = WiFi.onStationModeGotIP(cb_gotIP);

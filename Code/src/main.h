@@ -14,6 +14,7 @@
 
 #include <WebServer.h>
 #include <WiFi.h>
+#include <esp_system.h>
 
 #endif
 
