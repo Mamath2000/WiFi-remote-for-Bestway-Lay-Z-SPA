@@ -2,6 +2,10 @@
 #include "ports.h"
 
 #define WS_PERIOD 4.0
+// Boot sequence step timeouts - bounded waits, never block forever.
+#define BOOT_WIFI_TIMEOUT_MS      20000UL
+#define BOOT_HA_TIMEOUT_MS         8000UL
+#define BOOT_SPA_CHECK_TIMEOUT_MS  8000UL
 // initial stack
 char *stack_start;
 uint32_t heap_water_mark;
@@ -57,6 +61,89 @@ void cb_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
 }
 #endif
 
+/** (Re)send Home Assistant MQTT discovery ~5s after each MQTT (re)connect.
+ *  Returns true once discovery has been sent for the current connection (or
+ *  there is nothing to do), false while still waiting - used both to drive
+ *  the BOOT_HA_DISCOVERY boot stage and to keep re-declaring entities after
+ *  every later MQTT reconnect once the device is in normal operation. */
+bool maybeSendHADiscovery()
+{
+    static int ha_sent_for_count = 0;
+    static unsigned long ha_pending_since = 0;
+    if (!mqtt_info->useMqtt) return true;
+    if (!mqttClient->connected()) return false;
+    if (ha_sent_for_count >= mqtt_connect_count) return true;
+    if (ha_pending_since == 0) ha_pending_since = millis();
+    if (millis() - ha_pending_since < 5000UL) return false;
+    ha_pending_since = 0;
+    ha_sent_for_count = mqtt_connect_count;
+    BWC_LOG_P(PSTR("MQTT > Sending HA discovery\n"), 0);
+    mqttClient->setBufferSize(8192);
+    setupHA();
+    mqttClient->setBufferSize(512);
+    mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/Status")).c_str(), "Alive", true);
+    mqttClient->loop();
+    return true;
+}
+
+/** Advance the sequential boot FSM by at most one step per call. Each stage
+ *  waits for its predecessor's condition, bounded by a timeout so the device
+ *  never hangs waiting on WiFi/MQTT/spa hardware that may not be present. */
+void advanceBootSequence()
+{
+    switch (bootStage)
+    {
+        case BOOT_WIFI:
+            if (WiFi.status() == WL_CONNECTED || millis() - bootStageEnteredMs >= BOOT_WIFI_TIMEOUT_MS)
+            {
+                bootStage = BOOT_MQTT;
+                bootStageEnteredMs = millis();
+            }
+            break;
+
+        case BOOT_MQTT:
+            if (!mqtt_info->useMqtt || WiFi.status() != WL_CONNECTED)
+            {
+                BWC_LOG_P(PSTR("Boot > MQTT step skipped (disabled or no WiFi)\n"), 0);
+            }
+            else if (!mqttClient->connected())
+            {
+                mqttConnect(); // bounded by mqttClient->setSocketTimeout(30), set in startMqtt()
+            }
+            bootStage = BOOT_HA_DISCOVERY;
+            bootStageEnteredMs = millis();
+            break;
+
+        case BOOT_HA_DISCOVERY:
+            if (maybeSendHADiscovery() || millis() - bootStageEnteredMs >= BOOT_HA_TIMEOUT_MS)
+            {
+                bootStage = BOOT_SPA_CHECK;
+                bootStageEnteredMs = millis();
+            }
+            break;
+
+        case BOOT_SPA_CHECK:
+            if (bwc->spaLinkEverOk() || millis() - bootStageEnteredMs >= BOOT_SPA_CHECK_TIMEOUT_MS)
+            {
+                BWC_LOG_P(PSTR("Boot > spa link check: %s\n"), bwc->spaLinkEverOk() ? "OK" : "no response (timeout)");
+                bootStage = BOOT_SPA_LINK;
+                bootStageEnteredMs = millis();
+            }
+            break;
+
+        case BOOT_SPA_LINK:
+            sendWSFlag = true;
+            sendMQTTFlag = true;
+            BWC_LOG_P(PSTR("Boot > sequence complete @ millis: %d\n"), millis());
+            bootStage = BOOT_RUNNING;
+            break;
+
+        case BOOT_RUNNING:
+        default:
+            break;
+    }
+}
+
 void setup()
 {
     
@@ -111,6 +198,8 @@ void setup()
     loadWebConfig();
     startWiFi();
     if(wifi_info->enableWmApFallback) startSoftAp(); // not blocking anymore so no use case should exist for this to be turned off.
+    bootStage = BOOT_WIFI;
+    bootStageEnteredMs = millis();
     startHttpServer();
     startWebSocket();
     startOTA();
@@ -154,75 +243,65 @@ void loop()
         sendWSFlag = false;
         sendWS();
     }
-    // run only when a wifi connection is established
-    /* MQTT, OTA & NTP is not relevant in softAP mode */
-    if (WiFi.status() == WL_CONNECTED)
-    {
+    advanceBootSequence();
 
-        // MQTT
-        if (mqtt_info->useMqtt && mqttClient->loop())
+    // run only once BOOT_RUNNING is reached (WiFi/MQTT/HA/spa boot sequence complete or timed out)
+    if (bootStage == BOOT_RUNNING)
+    {
+        // run only when a wifi connection is established
+        /* MQTT, OTA & NTP is not relevant in softAP mode */
+        if (WiFi.status() == WL_CONNECTED)
         {
-            String msg;
-            msg.reserve(32);
-            bwc->getButtonName(msg);
-            // publish pretty button name if display button is pressed (or NOBTN if released)
-            if (!msg.equals(prevButtonName))
+
+            // MQTT
+            if (mqtt_info->useMqtt && mqttClient->loop())
             {
-                mqttClient->publish((String(mqtt_info->mqttBaseTopic) + "/button").c_str(), String(msg).c_str(), true);
-                prevButtonName = msg;
-            }
-            if (newData || sendMQTTFlag)
-            {
-                sendMQTT();
-                sendMQTTFlag = false;
-            }
-            if(send_mqtt_cfg_needed)
-            {
-                send_mqtt_cfg_needed = false;
-                sendMQTTConfig();
-            }
-            // Send HA discovery 5s after each (re)connect for connection stability
-            static int ha_sent_for_count = 0;
-            static unsigned long ha_pending_since = 0;
-            if (ha_sent_for_count < mqtt_connect_count)
-            {
-                if (ha_pending_since == 0) ha_pending_since = millis();
-                if (millis() - ha_pending_since >= 5000UL)
+                String msg;
+                msg.reserve(32);
+                bwc->getButtonName(msg);
+                // publish pretty button name if display button is pressed (or NOBTN if released)
+                if (!msg.equals(prevButtonName))
                 {
-                    ha_pending_since = 0;
-                    ha_sent_for_count = mqtt_connect_count;
-                    BWC_LOG_P(PSTR("MQTT > Sending HA discovery\n"),0);
-                    mqttClient->setBufferSize(8192);
-                    setupHA();
-                    mqttClient->setBufferSize(512);
-                    mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/Status")).c_str(), "Alive", true);
-                    mqttClient->loop();
+                    mqttClient->publish((String(mqtt_info->mqttBaseTopic) + "/button").c_str(), String(msg).c_str(), true);
+                    prevButtonName = msg;
                 }
+                if (newData || sendMQTTFlag)
+                {
+                    sendMQTT();
+                    sendMQTTFlag = false;
+                }
+                if(send_mqtt_cfg_needed)
+                {
+                    send_mqtt_cfg_needed = false;
+                    sendMQTTConfig();
+                }
+                // HA discovery is (re)sent 5s after each MQTT (re)connect; see maybeSendHADiscovery()
+                maybeSendHADiscovery();
+            }
+
+            if(checkNTP_flag)
+            {
+                checkNTP_flag = false;
+                checkNTP();
             }
         }
 
-        if(checkNTP_flag)
+        // run every X seconds
+        if (periodicTimerFlag)
         {
-            checkNTP_flag = false;
-            checkNTP();
+            periodicTimerFlag = false;
+            if(WiFi.getMode() == WIFI_AP_STA)
+            {
+                wifi_manual_reconnect();
+            }
+            if (mqtt_info->useMqtt && !mqttClient->loop() && (WiFi.status() == WL_CONNECTED))
+            {
+                BWC_LOG_P(PSTR("MQTT > Not connected\n"),0);
+                mqttConnect();
+            }
+            // Leverage the pre-existing periodicTimerFlag to also set temperature, if enabled
+            setTemperatureFromSensor();
         }
-    }
-
-    // run every X seconds
-    if (periodicTimerFlag)
-    {
-        periodicTimerFlag = false;
-        if(WiFi.getMode() == WIFI_AP_STA)
-        {
-            wifi_manual_reconnect();
-        }
-        if (mqtt_info->useMqtt && !mqttClient->loop() && (WiFi.status() == WL_CONNECTED))
-        {
-            BWC_LOG_P(PSTR("MQTT > Not connected\n"),0);
-            mqttConnect();
-        }
-        // Leverage the pre-existing periodicTimerFlag to also set temperature, if enabled
-        setTemperatureFromSensor();
     }
 
     //Only do this if locked out! (by pressing POWER - LOCK - TIMER - POWER)
@@ -282,6 +361,7 @@ void getOtherInfo(String &rtn)
     // Set the values in the document
     doc[F("CONTENT")] = F("OTHER");
     doc[F("MQTT")] = mqttClient->state();
+    doc[F("SPALINK")] = bwc->spaLinkHealthy();
     /*TODO: add these:*/
     //   doc[F("PressedButton")] = bwc->getPressedButton();
     doc[F("HASJETS")] = bwc->hasjets;
@@ -572,12 +652,16 @@ void startOTA()
         // Serial.printf("OTA > Progress: %u%%\r\n", (progress / (total / 100)));
     });
     ArduinoOTA.onError([](ota_error_t error) {
-        // Serial.printf("OTA > Error[%u]: ", error);
-        // if (error == OTA_AUTH_ERROR) Serial.println(F("Auth Failed"));
-        // else if (error == OTA_BEGIN_ERROR) Serial.println(F("Begin Failed"));
-        // else if (error == OTA_CONNECT_ERROR) Serial.println(F("Connect Failed"));
-        // else if (error == OTA_RECEIVE_ERROR) Serial.println(F("Receive Failed"));
-        // else if (error == OTA_END_ERROR) Serial.println(F("End Failed"));
+        // stopall() already ran in onStart() - HTTP/MQTT/spa comms are down and
+        // won't come back on their own. A failed transfer never reaches onEnd(),
+        // so without this the device would sit dead until a physical power-cycle.
+        BWC_LOG_P(PSTR("OTA > Error[%u], restarting\n"), error);
+        delay(500);
+        #ifdef ESP8266
+        ESP.reset();
+        #else
+        ESP.restart();
+        #endif
     });
     ArduinoOTA.begin();
     // Serial.println(F("OTA > ready"));
@@ -597,7 +681,9 @@ void stopall()
     // if(checkWifi_ticker->active()) checkWifi_ticker->detach();
     //bwc->saveSettings();
     delete tempSensors;
+    tempSensors = nullptr;
     delete oneWire;
+    oneWire = nullptr;
     BWC_LOG_P(PSTR("MQTT > stopping\n"),0);
     if(mqtt_info->useMqtt) mqttClient->disconnect();
     if(aWifiClient) delete aWifiClient;
@@ -840,7 +926,12 @@ void handleInputs()
     const int array_len = 1024;
     unsigned long* p_input_log = new unsigned long[array_len*2];
 
-    while(edge_count < array_len)
+    // Bounded wait: if the wiring is never touched (or isn't connected at
+    // all), fall through after HWINPUT_TIMEOUT_MS instead of hanging the
+    // whole firmware (WiFi/HTTP/MQTT/OTA) forever.
+    const unsigned long HWINPUT_TIMEOUT_MS = 30000UL;
+    unsigned long deadline = millis() + HWINPUT_TIMEOUT_MS;
+    while(edge_count < array_len && millis() < deadline)
     {
         pin_states = READ_PERI_REG(PIN_IN); //mix unsigned long with uint32_t which is the same
         if(pin_states != old_pin_states)
@@ -858,7 +949,7 @@ void handleInputs()
     char s[128];
     sprintf_P(s, PSTR("micros, gpio registers\n"));
     server->sendContent(s);
-    for(int i = 0; i < array_len; i++)
+    for(unsigned int i = 0; i < edge_count; i++)
     {
         sprintf_P(s, PSTR("%u,%X\n"), p_input_log[i], p_input_log[i+array_len]);
         server->sendContent(s);
@@ -963,7 +1054,11 @@ void handleHWtest()
     server->sendContent(result);
 
     server->sendContent("");
-    while(true)
+    // Bounded: used to be an infinite loop that froze WiFi/HTTP/MQTT/OTA until
+    // a physical reset. 12 cycles x 4x5s = ~4 minutes, plenty to probe with a
+    // multimeter, after which normal operation is restored below.
+    const int HWTEST_MAX_CYCLES = 12;
+    for(int cycle = 0; cycle < HWTEST_MAX_CYCLES; cycle++)
     {
         /*CIO pins HIGH*/
         for(int pin = 0; pin < 3; pin++)
@@ -998,6 +1093,7 @@ void handleHWtest()
         }
         delay(5000);
     }
+    server->sendContent(F("\nHW test done, restoring normal operation.\n"));
     bwc->setup();
 }
 
@@ -1026,7 +1122,6 @@ String getContentType(const String& filename)
  */
 bool handleFileRead(String path)
 {
-    pause_all(true);
     // Serial.println("HTTP > request: " + path);
     // If a folder is requested, send the index file
     if (path.endsWith("/"))
@@ -1038,7 +1133,6 @@ bool handleFileRead(String path)
     {
         server->send(403, F("text/plain"), F("Permission denied."));
         // Serial.println(F("HTTP > file reading denied (credentials)."));
-        pause_all(false);
         return false;
     }
     String contentType = getContentType(path);                  // Get the MIME type
@@ -1065,11 +1159,9 @@ bool handleFileRead(String path)
         if(fsize != sent){
             BWC_LOG_P(PSTR("^^^^^ File not completed ^^^^^\n"),0);
         }
-        pause_all(false);
         file.close();                                           // Close the file again
         return true;
     }
-    pause_all(false);
     // If the file doesn't exist, return false
     return false;
 }

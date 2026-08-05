@@ -166,8 +166,11 @@ void CIO_6_TYPE1::updateStates()
 /*End Of Packet.*/
 void IRAM_ATTR CIO_6_TYPE1::eopHandler(void) {
 //process latest data and enter corresponding mode (like listen for DSP_STS or send BTN_OUT)
-//pinMode(_DATA_PIN, INPUT);
+#ifdef ESP8266
     WRITE_PERI_REG( PIN_DIR_INPUT, 1 << _DATA_PIN);
+#else
+    pinMode(_DATA_PIN, INPUT);
+#endif
     if(_byte_count != 11 && _byte_count != 0) _packet_error |= 2;
     if(_bit_count != 0) _packet_error |= 1;
     _byte_count = 0;

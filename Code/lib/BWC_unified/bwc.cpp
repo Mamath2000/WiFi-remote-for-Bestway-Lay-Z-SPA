@@ -247,6 +247,7 @@ void BWC::loop(){
     _handleNotification();
     _handleStateChanges();
     _calcVirtualTemp();
+    _updateSpaLinkHealth();
     // logstates();
     if(BWC_DEBUG) _log();
     BWC_YIELD;
@@ -1284,6 +1285,42 @@ bool BWC::newData(){
     bool result = _new_data_available;
     _new_data_available = false;
     return result;
+}
+
+/* good_packets_count is the only link-health counter that is reliably
+   incremented across every CIO/DSP hardware variant - bad_packets_count and
+   packet_error are dead/unimplemented on some of them (e.g. CIO_TYPE2). */
+void BWC::_updateSpaLinkHealth()
+{
+    unsigned long now = millis();
+    if(cio != nullptr && cio->good_packets_count != _cioLink.prevGoodPackets)
+    {
+        _cioLink.prevGoodPackets = cio->good_packets_count;
+        _cioLink.lastChangeMs = now;
+        _cioLink.everOk = true;
+    }
+    if(dsp != nullptr && dsp->good_packets_count != _dspLink.prevGoodPackets)
+    {
+        _dspLink.prevGoodPackets = dsp->good_packets_count;
+        _dspLink.lastChangeMs = now;
+        _dspLink.everOk = true;
+    }
+}
+
+/* Has the link produced at least one valid packet on both cio and dsp since boot? */
+bool BWC::spaLinkEverOk()
+{
+    return _cioLink.everOk && _dspLink.everOk;
+}
+
+/* Same as spaLinkEverOk(), but also drops back to false if nothing has been
+   heard from either side in the last staleAfterMs - detects a link lost
+   after boot, not just a link that never came up. */
+bool BWC::spaLinkHealthy(uint32_t staleAfterMs)
+{
+    if(!spaLinkEverOk()) return false;
+    unsigned long now = millis();
+    return (now - _cioLink.lastChangeMs < staleAfterMs) && (now - _dspLink.lastChangeMs < staleAfterMs);
 }
 
 void BWC::_updateTimes(){

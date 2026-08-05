@@ -629,6 +629,14 @@
       animation: colorfade 1s linear 0s infinite alternate-reverse;
     }
 
+    /* Spa link status (footer) */
+    .status-ok {
+      color: rgb(60, 140, 60);
+    }
+    .status-bad {
+      color: rgb(172, 82, 82);
+    }
+
     @keyframes colorfade {
       0% { background-color: rgb(132, 39, 39); }
       100% { background-color: rgb(172, 82, 82); }

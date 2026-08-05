@@ -178,6 +178,10 @@ function handlemsg(e) {
             "CONNECT_UNAUTHORIZED", // 5 / the client was not authorized to connect
         ]
         document.getElementById("mqtt").innerHTML = "MQTT: " + mqtt_states[msgobj.MQTT + 4]
+        var spalinkEl = document.getElementById("spalink")
+        spalinkEl.innerHTML = "Spa link: " + (msgobj.SPALINK ? "OK" : "check wiring")
+        spalinkEl.classList.toggle("status-ok", !!msgobj.SPALINK)
+        spalinkEl.classList.toggle("status-bad", !msgobj.SPALINK)
         document.getElementById("fw").innerHTML = "Firmware: " + msgobj.FW
         document.getElementById("model").innerHTML = "Model: " + msgobj.MODEL
         document.getElementById("rssi").innerHTML = "RSSI: " + msgobj.RSSI

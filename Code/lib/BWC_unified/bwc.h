@@ -62,6 +62,8 @@ class BWC {
         bool del_command(uint8_t index);
         // bool qCommand(int64_t cmd, int64_t val, int64_t xtime, int64_t interval);
         bool newData();
+        bool spaLinkEverOk();
+        bool spaLinkHealthy(uint32_t staleAfterMs = 15000UL);
         void getJSONStates(String &rtn);
         void getJSONTimes(String &rtn);
         void getJSONSettings(String &rtn);
@@ -121,6 +123,16 @@ class BWC {
         void _beep();
         void _accord();
         void _log();
+        void _updateSpaLinkHealth();
+
+    private:
+        struct sLinkHealth
+        {
+            uint32_t prevGoodPackets = 0;
+            unsigned long lastChangeMs = 0;
+            bool everOk = false;
+        };
+        sLinkHealth _cioLink, _dspLink;
 
     private:
         uint64_t _timestamp_secs; // seconds

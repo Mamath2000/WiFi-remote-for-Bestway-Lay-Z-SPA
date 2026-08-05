@@ -310,6 +310,14 @@ void setupHA()
     cmp["pl_on"] = _alive;
     cmp["pl_off"] = _dead;
 
+    // Unlike "connection" (MQTT broker reachability via LWT), this reflects
+    // whether the ESP is actually hearing valid packets from the spa itself.
+    cmp = createComponent(cmps, "spa_link", "binary_sensor", F("Spa link"));
+    cmp[_stat_t] = topicOther;
+    cmp[_val_tpl] = F("{% if value_json.SPALINK %}ON{% else %}OFF{% endif %}");
+    cmp[_dev_cla] = F("connectivity");
+    cmp["exp_aft"] = defaultExpire;
+
     cmp = createComponent(cmps, "unit", "switch", F("Temperature unit F-C"));
     cmp[_stat_t] = topicMessage;
     cmp[_cmd_t] = topicCommand;

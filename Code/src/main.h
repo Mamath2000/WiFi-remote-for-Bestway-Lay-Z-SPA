@@ -51,6 +51,22 @@ bool send_mqtt_cfg_needed = false;
 bool gotIP_flag = false;
 bool disconnected_flag = false;
 
+/** Sequential boot stages: each stage is entered once its predecessor has
+ *  reached a terminal state (success, or a bounded timeout - never blocks
+ *  forever). Governs the *first* pass only; once BOOT_RUNNING is reached the
+ *  usual flag/ticker-driven logic in loop() takes back over permanently. */
+enum BootStage : uint8_t
+{
+    BOOT_WIFI,          // step 2: WiFi connection
+    BOOT_MQTT,          // step 3: MQTT connection
+    BOOT_HA_DISCOVERY,  // step 3.5: Home Assistant autodiscovery
+    BOOT_SPA_CHECK,     // step 4: sanity check - are we hearing the spa at all
+    BOOT_SPA_LINK,      // step 5: publish the spa link status once
+    BOOT_RUNNING
+};
+BootStage bootStage = BOOT_WIFI;
+unsigned long bootStageEnteredMs = 0;
+
 int periodicTimerInterval = 60;
 sWifi_info* wifi_info;
 
@@ -92,6 +108,8 @@ void cb_gotIP(WiFiEvent_t event, WiFiEventInfo_t info);
 void cb_disconnected(WiFiEvent_t event, WiFiEventInfo_t info);
 #endif
 void gotIP();
+void advanceBootSequence();
+bool maybeSendHADiscovery();
 void sendWS();
 void getOtherInfo(String &rtn);
 void sendMQTT();
