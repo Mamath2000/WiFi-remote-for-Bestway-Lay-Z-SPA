@@ -114,5 +114,6 @@ class DSP_6_TYPE2 : public DSP_6W
         const String MYDSPMODEL = "MODEL54149E";
         Buttons _old_button = NOBTN;
         Buttons _prev_button = NOBTN;
+        int _prevAudioFrequency = -1;
         uint8_t _payload[5];
 };

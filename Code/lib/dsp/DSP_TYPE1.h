@@ -109,5 +109,6 @@ class DSP_6_TYPE1 : public DSP_6W
 
     private:
         Buttons _old_button = NOBTN;
+        int _prevAudioFrequency = -1;
         uint8_t _payload[11] = {0xC0, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x01, 0x0};
 };
