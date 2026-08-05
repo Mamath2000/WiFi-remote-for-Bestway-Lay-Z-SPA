@@ -98,6 +98,7 @@ void sendMQTT();
 void sendMQTTConfig();
 void startWiFi();
 void wifi_manual_reconnect();
+bool selectBestAccessPoint(const String &ssid, int &bestChannel, uint8_t bestBssid[6]);
 void startSoftAp();
 void checkNTP_ISR();
 void checkNTP();

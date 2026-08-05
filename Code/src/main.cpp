@@ -405,6 +405,50 @@ void startWiFi()
     BWC_YIELD;
 }
 
+bool selectBestAccessPoint(const String &ssid, int &bestChannel, uint8_t bestBssid[6])
+{
+    bestChannel = 0;
+    memset(bestBssid, 0, 6);
+
+    if (ssid.length() == 0) return false;
+
+    BWC_LOG_P(PSTR("WiFi > scanning networks for SSID %s\n"), ssid.c_str());
+    int count = WiFi.scanNetworks();
+    if (count <= 0)
+    {
+        BWC_LOG_P(PSTR("WiFi > scan failed or no networks found (%d)\n"), count);
+        return false;
+    }
+
+    int bestRssi = -999;
+    for (int i = 0; i < count; ++i)
+    {
+        String foundSSID = WiFi.SSID(i);
+        if (foundSSID != ssid) continue;
+
+        int rssi = WiFi.RSSI(i);
+        if (rssi > bestRssi)
+        {
+            bestRssi = rssi;
+            bestChannel = WiFi.channel(i);
+            const uint8_t *bssidPtr = WiFi.BSSID(i);
+            if (bssidPtr)
+            {
+                memcpy(bestBssid, bssidPtr, 6);
+            }
+        }
+    }
+
+    if (bestRssi == -999)
+    {
+        BWC_LOG_P(PSTR("WiFi > SSID %s not found during scan\n"), ssid.c_str());
+        return false;
+    }
+
+    BWC_LOG_P(PSTR("WiFi > best AP for %s found on channel %d with RSSI %d\n"), ssid.c_str(), bestChannel, bestRssi);
+    return true;
+}
+
 void wifi_manual_reconnect()
 {
     /* Connect in station mode to the AP given (your router/ap) */
@@ -412,8 +456,19 @@ void wifi_manual_reconnect()
     {
         BWC_LOG_P(PSTR("WiFi > using WiFi configuration with SSID %s\n"), wifi_info->apSsid.c_str());
 
-        WiFi.begin(wifi_info->apSsid.c_str(), wifi_info->apPwd.c_str());
-        // checkWifi_ticker->attach(2.0, checkWiFi_ISR);
+        int channel = 0;
+        uint8_t bssid[6] = {0};
+        if (selectBestAccessPoint(wifi_info->apSsid, channel, bssid))
+        {
+            WiFi.begin(wifi_info->apSsid.c_str(), wifi_info->apPwd.c_str(), channel, bssid);
+            BWC_LOG_P(PSTR("WiFi > connecting to best AP on channel %d\n"), channel);
+        }
+        else
+        {
+            WiFi.begin(wifi_info->apSsid.c_str(), wifi_info->apPwd.c_str());
+            BWC_LOG_P(PSTR("WiFi > best AP not selected, connecting normally\n"), 0);
+        }
+
         BWC_LOG_P(PSTR("WiFi > AP info loaded. Waiting for connection ...\n"), 0);
     }
     else
