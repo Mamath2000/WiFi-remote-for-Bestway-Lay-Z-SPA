@@ -20,6 +20,10 @@ BWC::BWC()
     _heatingtime = 0;
     _airtime = 0;
     _jettime = 0;
+    _energy_total_Ws = 0;
+    _energy_daily_Ws = 0;
+    _energy_cost_total = 0;
+    _energy_cost_daily = 0;
     _pumptime_daily_ms = 0;
     _heatingtime_daily_ms = 0;
     _airtime_daily_ms = 0;
