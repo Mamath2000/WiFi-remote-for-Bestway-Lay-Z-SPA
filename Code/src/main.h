@@ -51,6 +51,9 @@ bool sendMQTTFlag = false;
 bool send_mqtt_cfg_needed = false;
 bool gotIP_flag = false;
 bool disconnected_flag = false;
+// Debug-level bwcLog() lines are noisy (raw CIO/DSP traffic) - opt-in only,
+// toggled at runtime via the "<base>/log_level" MQTT topic ("debug"/"info").
+bool mqtt_debug_enabled = false;
 
 /** Sequential boot stages: each stage is entered once its predecessor has
  *  reached a terminal state (success, or a bounded timeout - never blocks
@@ -168,6 +171,7 @@ void updateError(int err);
 void startMqtt();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttConnect();
+void mqttLogSink(const char* tag, LogLevel lvl, const char* msg);
 time_t getBootTime();
 void handleESPInfo();
 void setTemperatureFromSensor();

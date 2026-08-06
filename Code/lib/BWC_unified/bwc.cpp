@@ -1297,13 +1297,17 @@ void BWC::_updateSpaLinkHealth()
     {
         _cioLink.prevGoodPackets = cio->good_packets_count;
         _cioLink.lastChangeMs = now;
+        if(!_cioLink.everOk) bwcLog(LOGLVL_INFO, "CIO", "link established (first valid packet)");
         _cioLink.everOk = true;
+        bwcLog(LOGLVL_DEBUG, "CIO", "packet good=%lu bad=%lu", (unsigned long)cio->good_packets_count, (unsigned long)cio->bad_packets_count);
     }
     if(dsp != nullptr && dsp->good_packets_count != _dspLink.prevGoodPackets)
     {
         _dspLink.prevGoodPackets = dsp->good_packets_count;
         _dspLink.lastChangeMs = now;
+        if(!_dspLink.everOk) bwcLog(LOGLVL_INFO, "DSP", "link established (first valid packet)");
         _dspLink.everOk = true;
+        bwcLog(LOGLVL_DEBUG, "DSP", "packet good=%lu bad=%lu", (unsigned long)dsp->good_packets_count, (unsigned long)dsp->bad_packets_count);
     }
 }
 

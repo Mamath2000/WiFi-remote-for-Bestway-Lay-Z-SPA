@@ -26,4 +26,13 @@
 
 void log2file(const char* s);
 
+/* Transport-agnostic log sink: lib code (bwc/cio/dsp) calls bwcLog() without
+   knowing or caring who's listening. main.cpp registers a sink that forwards
+   to MQTT once connected - keeps MQTT/PubSubClient out of the lib/ tree. */
+enum LogLevel : uint8_t { LOGLVL_ERROR = 0, LOGLVL_INFO = 1, LOGLVL_DEBUG = 2 };
+typedef void (*LogSinkFn)(const char* tag, LogLevel lvl, const char* msg);
+
+void setLogSink(LogSinkFn fn);
+void bwcLog(LogLevel lvl, const char* tag, const char* fmt, ...);
+
 #endif //guard

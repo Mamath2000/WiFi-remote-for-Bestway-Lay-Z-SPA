@@ -57,6 +57,9 @@ void cb_disconnected(const WiFiEventStationModeDisconnected& event)
 #else
 void cb_disconnected(WiFiEvent_t event, WiFiEventInfo_t info)
 {
+    uint8_t reason = info.wifi_sta_disconnected.reason;
+    BWC_LOG_P(PSTR("WiFi > station disconnected, reason: %u (%s)\n"), reason, WiFi.disconnectReasonName((wifi_err_reason_t)reason));
+    bwcLog(LOGLVL_ERROR, "WIFI", "station disconnected, reason: %u (%s)", reason, WiFi.disconnectReasonName((wifi_err_reason_t)reason));
     disconnected_flag = true;
 }
 #endif
@@ -96,6 +99,7 @@ void advanceBootSequence()
         case BOOT_WIFI:
             if (WiFi.status() == WL_CONNECTED || millis() - bootStageEnteredMs >= BOOT_WIFI_TIMEOUT_MS)
             {
+                bwcLog(LOGLVL_INFO, "BOOT", "wifi step done (%s)", WiFi.status() == WL_CONNECTED ? "connected" : "timeout");
                 bootStage = BOOT_MQTT;
                 bootStageEnteredMs = millis();
             }
@@ -110,6 +114,7 @@ void advanceBootSequence()
             {
                 mqttConnect(); // bounded by mqttClient->setSocketTimeout(30), set in startMqtt()
             }
+            bwcLog(LOGLVL_INFO, "BOOT", "mqtt step done (%s)", mqttClient->connected() ? "connected" : "not connected");
             bootStage = BOOT_HA_DISCOVERY;
             bootStageEnteredMs = millis();
             break;
@@ -117,6 +122,7 @@ void advanceBootSequence()
         case BOOT_HA_DISCOVERY:
             if (maybeSendHADiscovery() || millis() - bootStageEnteredMs >= BOOT_HA_TIMEOUT_MS)
             {
+                bwcLog(LOGLVL_INFO, "BOOT", "HA discovery step done");
                 bootStage = BOOT_SPA_CHECK;
                 bootStageEnteredMs = millis();
             }
@@ -126,6 +132,7 @@ void advanceBootSequence()
             if (bwc->spaLinkEverOk() || millis() - bootStageEnteredMs >= BOOT_SPA_CHECK_TIMEOUT_MS)
             {
                 BWC_LOG_P(PSTR("Boot > spa link check: %s\n"), bwc->spaLinkEverOk() ? "OK" : "no response (timeout)");
+                bwcLog(bwc->spaLinkEverOk() ? LOGLVL_INFO : LOGLVL_ERROR, "BOOT", "spa link check: %s", bwc->spaLinkEverOk() ? "OK" : "no response (timeout)");
                 bootStage = BOOT_SPA_LINK;
                 bootStageEnteredMs = millis();
             }
@@ -135,6 +142,7 @@ void advanceBootSequence()
             sendWSFlag = true;
             sendMQTTFlag = true;
             BWC_LOG_P(PSTR("Boot > sequence complete @ millis: %d\n"), millis());
+            bwcLog(LOGLVL_INFO, "BOOT", "sequence complete @ millis: %lu", millis());
             bootStage = BOOT_RUNNING;
             break;
 
@@ -211,6 +219,7 @@ void setup()
         mqtt_info->useMqtt = MQTT_USEMQTT;
         wifi_info = new sWifi_info{.enableWmApFallback = true};
     }
+    setLogSink(mqttLogSink);
     bwc->setup();
     bwc->loop();
     periodicTimer->attach(periodicTimerInterval, []{ periodicTimerFlag = true; });
@@ -2088,6 +2097,26 @@ void startMqtt()
 }
 
 /**
+ * bwcLog() sink: forwards to "<base>/log" as JSON once MQTT is connected.
+ * info/error always go out; debug only while mqtt_debug_enabled is set
+ * (toggled via the "<base>/log_level" topic - see mqttCallback()).
+ */
+void mqttLogSink(const char* tag, LogLevel lvl, const char* msg)
+{
+    if(lvl == LOGLVL_DEBUG && !mqtt_debug_enabled) return;
+    if(mqttClient == nullptr || !mqttClient->connected()) return;
+    StaticJsonDocument<256> doc;
+    doc[F("ts")] = millis();
+    doc[F("tag")] = tag;
+    doc[F("lvl")] = lvl == LOGLVL_ERROR ? "error" : (lvl == LOGLVL_DEBUG ? "debug" : "info");
+    doc[F("msg")] = msg;
+    String json;
+    json.reserve(160);
+    serializeJson(doc, json);
+    mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/log")).c_str(), json.c_str(), false);
+}
+
+/**
  * MQTT callback function
  * @author 877dev
  */
@@ -2162,9 +2191,24 @@ void mqttCallback(char* topic, byte* payload, unsigned int length)
 
     if (String(topic).equals(String(mqtt_info->mqttBaseTopic) + F("/set_config")))
     {
-        String message = (const char *) &payload[0];    
+        // setJSONSettings() takes a String, so unlike /command and /command_batch
+        // above this can't use the deserializeJson(doc, payload, length) overload -
+        // bound the read to length explicitly instead of casting payload[0] to
+        // const char* (payload[] is NOT null-terminated).
+        String message;
+        message.reserve(length + 1);
+        for (unsigned int i = 0; i < length; i++) message += (char)payload[i];
         bwc->setJSONSettings(message);
         send_mqtt_cfg_needed = true;
+    }
+
+    if (String(topic).equals(String(mqtt_info->mqttBaseTopic) + F("/log_level")))
+    {
+        String message;
+        message.reserve(length + 1);
+        for (unsigned int i = 0; i < length; i++) message += (char)payload[i];
+        mqtt_debug_enabled = message.equalsIgnoreCase("debug");
+        bwcLog(LOGLVL_INFO, "LOG", "mqtt debug logging %s", mqtt_debug_enabled ? "enabled" : "disabled");
     }
 }
 
@@ -2219,6 +2263,7 @@ void mqttConnect()
         mqttClient->subscribe((String(mqtt_info->mqttBaseTopic) + F("/command")).c_str());
         mqttClient->subscribe((String(mqtt_info->mqttBaseTopic) + F("/command_batch")).c_str());
         mqttClient->subscribe((String(mqtt_info->mqttBaseTopic) + F("/set_config")).c_str());
+        mqttClient->subscribe((String(mqtt_info->mqttBaseTopic) + F("/log_level")).c_str());
         mqttClient->loop();
 
         #ifdef ESP8266
