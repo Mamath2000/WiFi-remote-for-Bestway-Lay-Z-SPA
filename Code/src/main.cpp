@@ -2105,8 +2105,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length)
     {
         // DynamicJsonDocument doc(256);
         StaticJsonDocument<256> doc;
-        String message = (const char *) &payload[0];
-        DeserializationError error = deserializeJson(doc, message);
+        // payload[] is NOT null-terminated - deserialize straight from the
+        // pointer+length instead of building a String that could overread.
+        DeserializationError error = deserializeJson(doc, payload, length);
         if (error)
         {
             return;
@@ -2131,8 +2132,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length)
     if (String(topic).equals(String(mqtt_info->mqttBaseTopic) + F("/command_batch")))
     {
         DynamicJsonDocument doc(1024);
-        String message = (const char *) &payload[0];
-        DeserializationError error = deserializeJson(doc, message);
+        // payload[] is NOT null-terminated - deserialize straight from the
+        // pointer+length instead of building a String that could overread.
+        DeserializationError error = deserializeJson(doc, payload, length);
         if (error)
         {
             return;
