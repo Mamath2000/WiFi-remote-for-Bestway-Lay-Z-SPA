@@ -54,6 +54,10 @@ bool disconnected_flag = false;
 // Debug-level bwcLog() lines are noisy (raw CIO/DSP traffic) - opt-in only,
 // toggled at runtime via the "<base>/log_level" MQTT topic ("debug"/"info").
 bool mqtt_debug_enabled = false;
+// Set once in setup() (ESP32 only, see esp_reset_reason()), published to
+// "<base>/reboot_reason" on the first MQTT connect - the ESP8266 branch
+// already had this via ESP.getResetReason(), ESP32 never did.
+String reset_reason_str;
 
 /** Sequential boot stages: each stage is entered once its predecessor has
  *  reached a terminal state (success, or a bounded timeout - never blocks

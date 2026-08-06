@@ -182,6 +182,7 @@ void setup()
             default: break;
         }
         BWC_LOG_P(PSTR("Reset reason: %d (%s)\n"), (int)r, reason);
+        reset_reason_str = reason; // published once MQTT connects, see mqttConnect()
     }
 #endif
     /*register wifi events */
@@ -2292,6 +2293,11 @@ void mqttConnect()
         mqttClient->loop();
         send_mqtt_cfg_needed = true;
         BWC_LOG_P(PSTR("MQTT > connect done\n"),0);
+        #else
+        if (!reset_reason_str.isEmpty())
+        {
+            mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/reboot_reason")).c_str(), reset_reason_str.c_str(), true);
+        }
         #endif
     }
     else
