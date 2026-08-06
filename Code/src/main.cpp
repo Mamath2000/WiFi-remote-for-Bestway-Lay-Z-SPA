@@ -260,6 +260,13 @@ void loop()
     }
     // listen for OTA events
     ArduinoOTA.handle();
+    // WebSockets on ESP32 uses the synchronous NETWORK_ESP32 backend (WiFiServer/WiFiClient,
+    // no AsyncTCP hook) - it must be pumped every loop() or the HTTP->WS upgrade handshake
+    // never completes and clients stay stuck "pending". On ESP8266 the build uses the async
+    // backend (NETWORK_ESP8266_ASYNC) where loop() is a deprecated no-op, so skip the call there.
+#ifndef ESP8266
+    if(webSocket) webSocket->loop();
+#endif
     // web socket
     if (newData || sendWSFlag)
     {
