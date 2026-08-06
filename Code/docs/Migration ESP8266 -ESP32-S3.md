@@ -254,3 +254,67 @@ Dans le menu **Hardware Config** (`hwconfig.html`) du firmware :
 - Vérifiez toujours la référence exacte **`ESP32-S3-DevKitC-1U-N16R8`** et non `ESP32-S3-DevKitC-1-N16R8`.
 - Pour l’usage d’une antenne externe, la variante **-U** est impérative.
 - Cette documentation est conçue pour être utilisée en Docusaurus ; le fichier est situé dans `docs/` avec une image et une référence PDF locales.
+
+## 10. Retour d'expérience : timing GPIO dans les ISR bit-bang CIO/DSP
+
+Le protocole CIO (communication avec la carte mère du spa) est décodé par bit-banging piloté
+par interruptions (`attachInterrupt` sur CS/CLK, voir `lib/cio/CIO_TYPE1.cpp` et
+`CIO_TYPE2.cpp`) — un protocole série synchrone où l'ESP doit lire/écrire chaque bit dans une
+fenêtre de quelques microsecondes après le front d'horloge envoyé par la carte du spa.
+
+### Le piège
+
+Le code ESP8266 d'origine accède aux registres GPIO **directement** (macros `WRITE_PERI_REG`/
+`READ_PERI_REG` avec les adresses définies dans `lib/BWC_unified/ports.h`) précisément pour
+tenir ce timing serré — `digitalWrite()`/`digitalRead()`/`pinMode()` d'Arduino ont un surcoût
+(validation de pin, appel de fonction) trop important pour ce cas d'usage.
+
+Lors d'un premier portage ESP32, ces appels avaient été remplacés côté `#else` par les
+équivalents Arduino portables (`digitalWrite`/`digitalRead`/`pinMode`) — ça **compile et
+fonctionne en apparence** (le CIO peut même établir un lien au boot), mais le surcoût de la
+couche HAL Arduino sur ESP32 mange une partie significative de la marge de timing du
+protocole. Symptôme observé : communication CIO/DSP intermittente ou totalement absente selon
+les cartes/pumps, et un bruit continu inquiétant sur le panneau physique du spa (l'ESP envoie
+des bits corrompus/décalés que le contrôleur du spa interprète comme des commandes erratiques).
+
+**`digitalWrite`/`pinMode`/`digitalRead` compilent et semblent marcher sur ESP32 — mais ne
+tiennent pas forcément le timing d'un protocole bit-bang piloté par ISR.** Ce n'est pas une
+erreur de compilation, donc rien ne prévient qu'il y a un problème avant un test matériel réel
+avec le spa branché.
+
+### Le fix : l'équivalent ESP32 des registres directs
+
+ESP32 (comme ESP8266) permet un accès registre direct en un seul cycle, via la struct globale
+`GPIO` (`soc/gpio_struct.h`, incluse par le core Arduino - pas d'include supplémentaire
+nécessaire) :
+
+| ESP8266 (`ports.h`) | Équivalent ESP32 |
+| --- | --- |
+| `WRITE_PERI_REG(PIN_OUT_SET, 1<<pin)` | `GPIO.out_w1ts = 1<<pin;` |
+| `WRITE_PERI_REG(PIN_OUT_CLEAR, 1<<pin)` | `GPIO.out_w1tc = 1<<pin;` |
+| `WRITE_PERI_REG(PIN_DIR_OUTPUT, 1<<pin)` | `GPIO.enable_w1ts = 1<<pin;` |
+| `WRITE_PERI_REG(PIN_DIR_INPUT, 1<<pin)` | `GPIO.enable_w1tc = 1<<pin;` |
+| `READ_PERI_REG(PIN_IN)` | `GPIO.in` |
+
+Prérequis : `pinMode()` doit avoir été appelé **une fois** au `setup()` pour configurer le
+mux/fonction du pin en GPIO (ce qui est déjà le cas dans ce projet) - ensuite, ne plus toucher
+que le bit d'`enable` pour changer la direction est suffisant et rapide, sans repasser par le
+setup complet de `pinMode()`. Valable uniquement pour les GPIO < 32 (tous les pins utilisés
+par ce projet le sont) ; au-delà, il faut les registres `out1_w1ts`/`enable1_w1ts`/etc.
+
+### Piège annexe découvert en creusant : `ports.h` n'a pas de garde de plateforme
+
+`lib/BWC_unified/ports.h` définit les adresses `PIN_OUT_SET`/`PIN_OUT_CLEAR`/`PIN_DIR_OUTPUT`/
+`PIN_DIR_INPUT`/`PIN_IN` comme des **adresses mémoire physiques ESP8266 codées en dur**
+(`0x60000300`-`0x60000318`), sans aucun `#ifdef ESP8266`. Le fichier lui-même ne protège donc
+rien : c'est à chaque site d'appel de garder `#ifdef ESP8266 ... #else ... #endif`. Un des
+fichiers CIO (`CIO_TYPE2.cpp`, utilisé par les modèles 54149E/54173/54154/54144/54138/54123)
+avait été porté sans cette garde — sur ESP32-S3, ces adresses tombent dans les registres
+d'**UART0** (`DR_REG_UART_BASE = 0x60000000` dans le SDK, alors que le vrai GPIO est à
+`DR_REG_GPIO_BASE = 0x60004000`), donc chaque front d'horloge CIO lisait/écrivait dans le
+port de debug série au lieu du vrai pin.
+
+**Leçon pour un futur portage** : si un nouveau modèle CIO/DSP est ajouté par copier-coller
+d'un fichier existant, vérifier explicitement qu'aucun `READ_PERI_REG`/`WRITE_PERI_REG` ne
+subsiste sans son `#ifdef ESP8266`/`#else` - le compilateur ne le détectera pas (les macros
+existent bel et bien sur ESP32, elles pointent juste vers le mauvais périphérique).

@@ -1,4 +1,9 @@
-# Handoff — portage ESP32-S3 + refactor boot séquencé
+# Handoff — portage ESP32-S3 + refactor boot séquencé — RÉSOLU
+
+> **Statut (2026-08-06) : tous les blocages listés ci-dessous sont résolus et validés sur
+> matériel réel.** Voir [## Résolution](#résolution-session-du-2026-08-06) pour le détail des
+> causes racines et des fixes. Ce fichier est conservé comme trace de l'investigation (utile
+> si un symptôme similaire réapparaît sur un autre modèle/carte), pas comme TODO actif.
 
 Contexte pour reprendre le fil sur une autre machine (accès USB au board). Coller ce fichier
 (ou son chemin) dans le premier message d'une nouvelle session Claude Code.
@@ -28,6 +33,77 @@ Contexte pour reprendre le fil sur une autre machine (accès USB au board). Coll
    - **Compile proprement sur les deux cibles** (`pio run -e esp32s3-devkitc1u-n16r8` et
      `-e nodemcuv2`, + `pio run -e esp32s3-devkitc1u-n16r8 -t buildfs` pour le filesystem).
    - **Pas encore testé sur le matériel réel** — c'est l'objet du blocage actuel.
+
+## Résolution (session du 2026-08-06)
+
+### 1. Boot loop initial : brownout
+
+Ajout d'un log de `esp_reset_reason()` juste après `Serial.begin()` (donc en ASCII fiable
+même quand le reste du dump de crash est illisible - voir §4 ci-dessous). Résultat sans appel
+: **`BROWNOUT`**. Le reset survient systématiquement pile au démarrage du SoftAP WiFi (pic de
+courant TX radio, en plus du bit-banging CIO/DSP et du level shifter TXS0108E). Fix matériel
+(pas logiciel) : câble/port USB de meilleure qualité ou alimentation externe 5V capable
+d'encaisser le pic. Confirmé : `Reset reason: 1 (POWERON)` propre après changement d'alim.
+
+### 2. Flood LEDC (`ledc: ledc_set_duty is not initialized`)
+
+Confirmé fatal, contrairement à l'hypothèse initiale de "juste un warning". `noTone()` sur
+ESP32 (arduino-esp32 core 3.x) poste dans une queue FreeRTOS (capacité 128) traitée par une
+tâche qui logue une erreur LEDC à chaque appel sur un pin jamais attaché. `dsp->handleStates()`
+rappelait `noTone()` à chaque `loop()` principal (donc en continu), la queue se remplissait
+plus vite qu'elle ne se vidait (chaque log prenant du temps à sortir sur l'UART à 76800 bauds)
+jusqu'à bloquer `loopTask` sur l'envoi -> Task Watchdog -> reboot. Fix : `tone()`/`noTone()`
+seulement sur changement réel de `audiofrequency` (`lib/dsp/DSP_TYPE1.cpp`/`DSP_TYPE2.cpp`).
+C'était bien lié au bug de "bip continu" mentionné plus bas dans l'ancienne section.
+
+### 3. Le "bloc de données binaires illisibles"
+
+Confirmé cosmétique : bannière de reset ROM à un baud fixe différent de celui de l'app,
+garbled par le moniteur PlatformIO. Pas le contenu du crash. `monitor_filters =
+esp32_exception_decoder, default` ajouté à l'env pour les prochains crashs ASCII.
+
+### 4. Nouveau blocage découvert : ESP32 ne discutait pas avec le spa (bruit continu sur boutons)
+
+Une fois le boot stabilisé, un second problème est apparu (absent du blocage initial) : une
+fois branché sur le vrai spa, le CIO/DSP ne communiquait pas et le panneau du spa émettait un
+bruit continu inquiétant. Root cause : les ISR bit-bang CIO (`lib/cio/CIO_TYPE1.cpp` :
+`isr_packetHandler`/`isr_clkHandler`/`eopHandler`) utilisaient `digitalWrite`/`digitalRead`/
+`pinMode` côté ESP32 (`#else` du `#ifdef ESP8266`), alors que le code ESP8266 d'origine
+accède aux registres GPIO en direct via `ports.h` pour tenir le timing serré du protocole.
+Le surcoût Arduino HAL sur ESP32 mangeait la marge de timing. Fix : accès direct à la struct
+`GPIO` d'ESP32 (`GPIO.out_w1ts`/`out_w1tc`, `GPIO.enable_w1ts`/`enable_w1tc`, `GPIO.in`),
+équivalent structurel des registres ESP8266.
+
+En creusant, bug distinct trouvé dans `lib/cio/CIO_TYPE2.cpp` (modèles 54149E/54173/54154/
+54144/54138/54123, pas le modèle testé) : les mêmes appels `READ_PERI_REG`/`WRITE_PERI_REG`
+y tournaient **sans aucun `#ifdef ESP8266`**. `ports.h` code en dur des adresses physiques
+ESP8266 (`0x60000300`-`0x60000318`) sans garde de plateforme ; sur ESP32-S3 ces adresses
+tombent dans les registres d'**UART0** (vérifié dans le SDK : `DR_REG_UART_BASE = 0x60000000`,
+alors que le vrai GPIO est à `DR_REG_GPIO_BASE = 0x60004000`). Chaque front d'horloge CIO
+lisait/corrompait donc UART0 (le port de debug série !) au lieu du vrai pin. Corrigé avec le
+même pattern `#ifdef`/registres GPIO rapides que CIO_TYPE1.
+
+**Validé sur matériel réel** (ESP32-S3 + spa MALDIVES2021, via MQTT structuré `layzspa/log`
+pendant le test live) : CIO+DSP link établis, communication stable dans la durée, bruit
+disparu, panneau plus réactif qu'avec l'ESP8266 d'origine.
+
+### 5. Bonus découverts pendant l'investigation
+
+- WebSocket ne complétait jamais son handshake sur ESP32 : `webSocket->loop()` manquant dans
+  `loop()` (nécessaire pour le backend synchrone `NETWORK_ESP32` de la lib WebSockets,
+  contrairement au backend async utilisé côté ESP8266).
+- Lecture non bornée du payload MQTT (`(const char *)&payload[0]` sans `length`) dans
+  `mqttCallback()` pour `/command`, `/command_batch`, `/set_config`, `/log_level`.
+- Log MQTT structuré ajouté (`bwcLog()` dans `lib/BWC_unified/bwc_debug.h`/`.cpp`) : publie
+  sur `<base>/log` en JSON, niveau info/error par défaut, debug togglable à chaud via
+  `<base>/log_level` — c'est ce qui a servi à diagnostiquer le point 4 sans accès série.
+
+Historique complet des commits (branche `port/esp32-s3`) : `e7914f8` → `6f74be3`.
+
+---
+
+*Ce qui suit est le contenu original de l'investigation, conservé tel quel pour référence
+historique (hypothèses de l'époque, certaines confirmées ci-dessus, d'autres écartées).*
 
 ## Blocage en cours : crash-loop après reflash
 
@@ -98,6 +174,9 @@ Setup > Start @ millis: 252   <- reboot
    Custom, pins CIO data/clk/cs = 4/5/6, DSP data/clk/cs/audio = 7/15/16/17**.
 
 ## État git
+
+*(état au moment de la rédaction initiale, avant résolution - voir le tableau de commits
+dans la section [Résolution](#résolution-session-du-2026-08-06) pour l'état final)*
 
 Branche `port/esp32-s3`. 15 fichiers modifiés, non commités au moment de la rédaction de ce
 handoff (voir `git status`/`git diff` pour l'état exact). Remote `origin` =
