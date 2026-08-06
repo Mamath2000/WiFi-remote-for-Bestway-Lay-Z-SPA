@@ -180,6 +180,7 @@ void setupHA()
     const String topicRebootTime = baseTopic + F("/reboot_time");
     const String topicRebootReason = baseTopic + F("/reboot_reason");
     const String topicMqttConnectCount = baseTopic + F("/MQTT_Connect_Count");
+    const String topicLogLevel = baseTopic + F("/log_level");
 
     auto makeUniqueId = [&](const char* suffix) {
         return baseTopic + F("_") + String(suffix) + mychipid;
@@ -317,6 +318,17 @@ void setupHA()
     cmp[_val_tpl] = F("{% if value_json.SPALINK %}ON{% else %}OFF{% endif %}");
     cmp[_dev_cla] = F("connectivity");
     cmp["exp_aft"] = defaultExpire;
+
+    // ON = verbose per-packet CIO/DSP logging on <base>/log (see bwcLog()/mqttLogSink()
+    // in main.cpp) - noisy, meant to be toggled on only while actively debugging.
+    cmp = createComponent(cmps, "mqtt_debug", "switch", F("MQTT debug logging"), false);
+    cmp[_stat_t] = topicLogLevel;
+    cmp[_cmd_t] = topicLogLevel;
+    cmp["pl_on"] = F("debug");
+    cmp["pl_off"] = F("info");
+    cmp["stat_on"] = F("debug");
+    cmp["stat_off"] = F("info");
+    cmp["ic"] = F("mdi:bug-outline");
 
     cmp = createComponent(cmps, "unit", "switch", F("Temperature unit F-C"));
     cmp[_stat_t] = topicMessage;

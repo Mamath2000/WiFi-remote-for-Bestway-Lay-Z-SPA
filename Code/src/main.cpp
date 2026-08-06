@@ -2209,6 +2209,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length)
         for (unsigned int i = 0; i < length; i++) message += (char)payload[i];
         mqtt_debug_enabled = message.equalsIgnoreCase("debug");
         bwcLog(LOGLVL_INFO, "LOG", "mqtt debug logging %s", mqtt_debug_enabled ? "enabled" : "disabled");
+        // Re-publish (retained) so the HA switch's state_topic reflects the change
+        // immediately, instead of waiting for the next reconnect.
+        mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/log_level")).c_str(), mqtt_debug_enabled ? "debug" : "info", true);
     }
 }
 
@@ -2257,6 +2260,9 @@ void mqttConnect()
         mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/Status")).c_str(), "Alive", true);
         mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/MAC_Address")).c_str(), WiFi.macAddress().c_str(), true);                 // Device MAC Address
         mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/MQTT_Connect_Count")).c_str(), String(mqtt_connect_count).c_str(), true); // MQTT Connect Count
+        // Retained so the HA "MQTT debug" switch reflects the real state on (re)connect,
+        // instead of showing unknown/stale until the next manual toggle.
+        mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/log_level")).c_str(), mqtt_debug_enabled ? "debug" : "info", true);
         mqttClient->loop();
 
         // Watch the 'command' topic for incoming MQTT messages
