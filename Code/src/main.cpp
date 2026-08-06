@@ -1276,7 +1276,7 @@ void handleAddCommand()
     DeserializationError error = deserializeJson(doc, message);
     if (error)
     {
-        server->send(400, "text/plain", String("Error deserializing message: ") + message);
+        server->send(400, F("text/plain"), String(F("Error deserializing message: "))+message);
         return;
     }
 

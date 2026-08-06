@@ -86,7 +86,7 @@ void BWC::setup(void){
         pins[5] = D6;
         pins[6] = D7;
         pins[7] = D8;
-        #else
+        #elif CONFIG_IDF_TARGET_ESP32S3
         // Waveshare ESP32-S3-Zero — pins par défaut GPIO4-GPIO11
         pins[0] = 4;   // CIO DATA / CIO RX
         pins[1] = 5;   // CIO CLK  / CIO TX
@@ -96,6 +96,17 @@ void BWC::setup(void){
         pins[5] = 9;   // DSP CS
         pins[6] = 10;  // AUDIO/PWM
         pins[7] = 11;  // Sonde température (OneWire)
+        #else
+        // ESP32 classique (WROOM-32/32U/32D) — GPIO6-11 réservées à la flash SPI
+        // interne du module, inutilisables ici contrairement à l'ESP32-S3
+        pins[0] = 4;   // CIO DATA / CIO RX
+        pins[1] = 13;  // CIO CLK  / CIO TX
+        pins[2] = 14;  // CIO CS
+        pins[3] = 16;  // DSP DATA / DSP TX
+        pins[4] = 17;  // DSP CLK  / DSP RX
+        pins[5] = 18;  // DSP CS
+        pins[6] = 21;  // AUDIO/PWM
+        pins[7] = 22;  // Sonde température (OneWire)
         #endif
     }
     // Serial.printf("Cio loaded: %d, dsp model: %d\n", ciomodel, dspmodel);

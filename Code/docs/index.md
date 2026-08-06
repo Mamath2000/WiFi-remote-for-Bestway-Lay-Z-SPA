@@ -11,6 +11,7 @@ Ce dossier contient la documentation technique pour le fork ESP32 du projet WiFi
 ## Pages disponibles
 
 - **Migration ESP8266 → ESP32-S3**: notes de portage, choix de carte, contraintes GPIO, câblage et configuration.
+- **Migration ESP8266 → ESP32-DevKitC V4 (WROOM-32U, USB-C)**: variante économique sans PSRAM, contraintes GPIO spécifiques, câblage proposé (non validé matériel) et configuration.
 
 ## Usage
 
