@@ -2208,7 +2208,14 @@ void mqttCallback(char* topic, byte* payload, unsigned int length)
         String message;
         message.reserve(length + 1);
         for (unsigned int i = 0; i < length; i++) message += (char)payload[i];
-        mqtt_debug_enabled = message.equalsIgnoreCase("debug");
+        bool newState = message.equalsIgnoreCase("debug");
+        // The device is subscribed to this same topic (command_topic == state_topic
+        // for the HA switch), so re-publishing here gets echoed straight back to
+        // mqttCallback() by the broker (MQTT 3.1.1 has no "no local" option) - without
+        // this guard, any publish triggers an infinite receive/republish feedback loop.
+        // Bail out before touching anything if the state hasn't actually changed.
+        if (newState == mqtt_debug_enabled) return;
+        mqtt_debug_enabled = newState;
         bwcLog(LOGLVL_INFO, "LOG", "mqtt debug logging %s", mqtt_debug_enabled ? "enabled" : "disabled");
         // Re-publish (retained) so the HA switch's state_topic reflects the change
         // immediately, instead of waiting for the next reconnect.
