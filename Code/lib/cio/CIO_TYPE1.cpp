@@ -169,7 +169,11 @@ void IRAM_ATTR CIO_6_TYPE1::eopHandler(void) {
 #ifdef ESP8266
     WRITE_PERI_REG( PIN_DIR_INPUT, 1 << _DATA_PIN);
 #else
-    pinMode(_DATA_PIN, INPUT);
+    // Direction only (GPIO_ENABLE bit) - pinMode() already set up the pin's
+    // IO_MUX function/input-buffer once in setup(); toggling only the enable
+    // bit here is the ESP32 equivalent of ESP8266's PIN_DIR_INPUT and avoids
+    // the pinMode() call overhead on this interrupt-timing-critical path.
+    GPIO.enable_w1tc = (1 << _DATA_PIN);
 #endif
     if(_byte_count != 11 && _byte_count != 0) _packet_error |= 2;
     if(_bit_count != 0) _packet_error |= 1;
@@ -213,7 +217,7 @@ void IRAM_ATTR CIO_6_TYPE1::isr_packetHandler() {
     #ifdef ESP8266
     if ((READ_PERI_REG(PIN_IN) & (1 << _CS_PIN))) {
     #else
-    if(digitalRead(_CS_PIN)) {
+    if (GPIO.in & (1 << _CS_PIN)) {
     #endif
         //end of packet (CS is idle at high)
         _packet_transm_active = false;
@@ -238,7 +242,7 @@ void IRAM_ATTR CIO_6_TYPE1::isr_clkHandler(void) {
     #ifdef ESP8266
     bool clockstate = READ_PERI_REG(PIN_IN) & (1 << _CLK_PIN);
     #else
-    bool clockstate = digitalRead(_CLK_PIN);
+    bool clockstate = GPIO.in & (1 << _CLK_PIN);
     #endif
     //shift out bits on low clock (falling edge)
     if (!clockstate & _data_is_output) {
@@ -248,7 +252,7 @@ void IRAM_ATTR CIO_6_TYPE1::isr_clkHandler(void) {
             #ifdef ESP8266
             WRITE_PERI_REG( PIN_OUT_SET, 1 << _DATA_PIN);
             #else
-            digitalWrite(_DATA_PIN, 1);
+            GPIO.out_w1ts = (1 << _DATA_PIN);
             #endif
         }
         else {
@@ -256,7 +260,7 @@ void IRAM_ATTR CIO_6_TYPE1::isr_clkHandler(void) {
             #ifdef ESP8266
             WRITE_PERI_REG( PIN_OUT_CLEAR, 1 << _DATA_PIN);
             #else
-            digitalWrite(_DATA_PIN, 0);
+            GPIO.out_w1tc = (1 << _DATA_PIN);
             #endif
         }
         _send_bit++;
@@ -272,7 +276,7 @@ void IRAM_ATTR CIO_6_TYPE1::isr_clkHandler(void) {
     #ifdef ESP8266
         _received_byte = (_received_byte >> 1) | ( ( (READ_PERI_REG(PIN_IN) & (1 << _DATA_PIN)) ) > 0) << 7;
     #else
-        _received_byte = (_received_byte >> 1) | digitalRead(_DATA_PIN) << 7;
+        _received_byte = (_received_byte >> 1) | (((GPIO.in & (1 << _DATA_PIN)) > 0) << 7);
     #endif
         _bit_count++;
         if (_bit_count == 8) {
@@ -299,7 +303,7 @@ void IRAM_ATTR CIO_6_TYPE1::isr_clkHandler(void) {
             #ifdef ESP8266
                 WRITE_PERI_REG( PIN_DIR_OUTPUT, 1 << _DATA_PIN);
             #else
-                pinMode(_DATA_PIN, OUTPUT);
+                GPIO.enable_w1ts = (1 << _DATA_PIN);
             #endif
             }
             CIO_CMD_LOG[CIO_CMD_LOG_index++] = (uint8_t)_received_byte;

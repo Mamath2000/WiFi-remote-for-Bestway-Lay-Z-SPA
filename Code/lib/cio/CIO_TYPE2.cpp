@@ -161,11 +161,24 @@ void CIO_6_TYPE2::updateStates()
 //packet start/stop
 void IRAM_ATTR CIO_6_TYPE2::LED_Handler(void) {
     //Check START/END condition: _LD_PIN change when _CLK_PIN is high.
+    // NOTE: these READ_PERI_REG/PIN_IN calls used to run unguarded on ESP32 too.
+    // ports.h hardcodes ESP8266 physical register addresses (0x60000300 region),
+    // which on ESP32-S3 land inside UART0's register block (real GPIO is at
+    // 0x60004000) - every CLK/LD edge was reading/corrupting UART0 instead of
+    // the actual pins. Fixed by branching to the ESP32 GPIO struct like CIO_TYPE1.cpp.
+#ifdef ESP8266
     if (READ_PERI_REG(PIN_IN) & (1 << _CIO_CLK_PIN)) {
+#else
+    if (GPIO.in & (1 << _CIO_CLK_PIN)) {
+#endif
         _byte_count = 0;
         _bit_count = 0;
         _received_cmd = 0;
+#ifdef ESP8266
         _new_packet_available = (READ_PERI_REG(PIN_IN) & (1 << _CIO_LD_PIN)) > 0;
+#else
+        _new_packet_available = (GPIO.in & (1 << _CIO_LD_PIN)) > 0;
+#endif
         _packet_transm_active = !_new_packet_available;
     }
 }
@@ -178,16 +191,28 @@ void IRAM_ATTR CIO_6_TYPE2::clkHandler(void) {
     uint16_t buttonwrapper = (B11111110 << 8) | (_button_code<<1); //startbit @ bit0, stopbit @ bit9
 
     //rising or falling edge?
+#ifdef ESP8266
     bool risingedge = READ_PERI_REG(PIN_IN) & (1 << _CIO_CLK_PIN);
+#else
+    bool risingedge = GPIO.in & (1 << _CIO_CLK_PIN);
+#endif
     if(risingedge){
         //clk rising edge
         _byte_count = _bit_count / 8;
         if(_byte_count == 0){
+#ifdef ESP8266
         _received_cmd |= ((READ_PERI_REG(PIN_IN) & (1 << _CIO_LD_PIN))>0) << ld_bitnumber;
+#else
+        _received_cmd |= ((GPIO.in & (1 << _CIO_LD_PIN))>0) << ld_bitnumber;
+#endif
         }
         else if( (_byte_count<6) && (_received_cmd == CMD2) ){ //only write to _raw_payload_from_cio after CMD2. Also protect from buffer overflow
         //overwrite the old _raw_payload_from_cio bit with new bit
+#ifdef ESP8266
         _payload[_byte_count-1] = (_payload[_byte_count-1] & ~(1 << ld_bitnumber)) | ((READ_PERI_REG(PIN_IN) & (1 << _CIO_LD_PIN))>0) << ld_bitnumber;
+#else
+        _payload[_byte_count-1] = (_payload[_byte_count-1] & ~(1 << ld_bitnumber)) | ((GPIO.in & (1 << _CIO_LD_PIN))>0) << ld_bitnumber;
+#endif
         }
         //store brightness in cio local variable. It is not used, but put here in case we want to obey the pump.
         if(_bit_count == 7 && (_received_cmd & B11000000) == B10000000) _brightness = _received_cmd;
@@ -196,9 +221,17 @@ void IRAM_ATTR CIO_6_TYPE2::clkHandler(void) {
         //clk falling edge
         //first and last bit is a dummy start/stop bit (0/1), then 8 data bits in btwn
         if (buttonwrapper & (1 << td_bitnumber)) {
+#ifdef ESP8266
         WRITE_PERI_REG( PIN_OUT_SET, 1 << _CIO_TD_PIN);
+#else
+        GPIO.out_w1ts = (1 << _CIO_TD_PIN);
+#endif
         } else {
+#ifdef ESP8266
         WRITE_PERI_REG( PIN_OUT_CLEAR, 1 << _CIO_TD_PIN);
+#else
+        GPIO.out_w1tc = (1 << _CIO_TD_PIN);
+#endif
         }
     }
 }
