@@ -158,10 +158,8 @@ function tryParseJSONObject(jsonString) {
 }
 
 function handlemsg(e) {
-    console.log(e.data)
     var msgobj = tryParseJSONObject(e.data)
     if (!msgobj) return
-    console.log(msgobj)
 
     if (msgobj.CONTENT == "OTHER") {
         // MQTT status
@@ -327,11 +325,8 @@ function s2dhms(val) {
 }
 
 function sendCommand(cmd) {
-    console.log(cmd)
-    console.log(typeof cmdMap[cmd])
     // check command
     if (typeof cmdMap[cmd] == "undefined") {
-        console.log("invalid command")
         return
     }
 
@@ -374,7 +369,6 @@ function sendCommand(cmd) {
     obj["TXT"] = ""
     var json = JSON.stringify(obj)
     connection.send(json)
-    console.log(json)
 }
 
 function getProperValue(val, min, max) {
