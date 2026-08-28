@@ -1113,7 +1113,7 @@ void BWC::getJSONTimes(String &rtn) {
     doc[F("FRINI")] = _filter_rinse_interval;
     doc[F("FCLEI")] = _filter_clean_interval;
     doc[F("CLINT")] = _cl_interval;
-    doc[F("KWH")] = _energy_total_Ws / 3600000.0; //Ws -> kWh
+    doc[F("WH")] = _energy_total_Ws / 3600000.0; //Ws -> kWh
     doc[F("KWHD")] = _energy_daily_Ws / 3600000.0; //Ws -> kWh
     doc[F("WATT")] = _energy_power_W;
     auto pl = cio->getPowerLevels();
@@ -1124,11 +1124,11 @@ void BWC::getJSONTimes(String &rtn) {
     doc[F("WATT_JET")]  = cio->cio_states.jets    ? pl.JETPOWER  : 0;
     doc[F("WATT_IDLE")] = pl.IDLEPOWER;
     int heaterPwrNominal = pl.HEATERPOWER_STAGE1 + pl.HEATERPOWER_STAGE2;
-    doc[F("KWH_PUMP")] = (_pumptime    + _pumptime_ms/1000)    * (double)pl.PUMPPOWER     / 3600000.0;
-    doc[F("KWH_HEAT")] = (_heatingtime + _heatingtime_ms/1000) * (double)heaterPwrNominal / 3600000.0;
-    doc[F("KWH_AIR")]  = (_airtime     + _airtime_ms/1000)     * (double)pl.AIRPOWER   / 3600000.0;
-    doc[F("KWH_JET")]  = (_jettime     + _jettime_ms/1000)     * (double)pl.JETPOWER   / 3600000.0;
-    doc[F("KWH_IDLE")] = (_uptime      + _uptime_ms/1000)      * (double)pl.IDLEPOWER  / 3600000.0;
+    doc[F("WH_PUMP")] = (_pumptime    + _pumptime_ms/1000)    * (double)pl.PUMPPOWER     / 3600000.0;
+    doc[F("WH_HEAT")] = (_heatingtime + _heatingtime_ms/1000) * (double)heaterPwrNominal / 3600000.0;
+    doc[F("WH_AIR")]  = (_airtime     + _airtime_ms/1000)     * (double)pl.AIRPOWER   / 3600000.0;
+    doc[F("WH_JET")]  = (_jettime     + _jettime_ms/1000)     * (double)pl.JETPOWER   / 3600000.0;
+    doc[F("WH_IDLE")] = (_uptime      + _uptime_ms/1000)      * (double)pl.IDLEPOWER  / 3600000.0;
     doc[F("KWHD_PUMP")] = _pumptime_daily_ms    / 1000.0 * (double)pl.PUMPPOWER     / 3600000.0;
     doc[F("KWHD_HEAT")] = _heatingtime_daily_ms / 1000.0 * (double)heaterPwrNominal / 3600000.0;
     doc[F("KWHD_AIR")]  = _airtime_daily_ms     / 1000.0 * (double)pl.AIRPOWER   / 3600000.0;

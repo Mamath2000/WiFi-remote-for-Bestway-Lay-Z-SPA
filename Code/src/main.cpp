@@ -235,6 +235,10 @@ void loop()
         server->handleClient();
         // Serial.print(".");
     }
+    // listen for websocket events (no-op on ESP8266_ASYNC, required on ESP32)
+    if(webSocket){
+        webSocket->loop();
+    }
     // listen for OTA events
     ArduinoOTA.handle();
     // web socket

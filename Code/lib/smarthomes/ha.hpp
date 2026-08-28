@@ -720,8 +720,8 @@ void setupHA()
 
     cmp = createComponent(cmps, "energy_pump", "sensor", F("Pump index"));
     cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ value_json.KWH_PUMP | round(3) }}");
-    cmp[_unit_of_meas] = F("kWh");
+    cmp[_val_tpl] = F("{{ value_json.WH_PUMP | round(3) }}");
+    cmp[_unit_of_meas] = F("Wh");
     cmp[_dev_cla] = F("energy");
     cmp["stat_cla"] = F("total_increasing");
     cmp["exp_aft"] = defaultExpire;
@@ -729,8 +729,8 @@ void setupHA()
 
     cmp = createComponent(cmps, "energy_heater", "sensor", F("Heater index"));
     cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ value_json.KWH_HEAT | round(3) }}");
-    cmp[_unit_of_meas] = F("kWh");
+    cmp[_val_tpl] = F("{{ value_json.WH_HEAT | round(3) }}");
+    cmp[_unit_of_meas] = F("Wh");
     cmp[_dev_cla] = F("energy");
     cmp["stat_cla"] = F("total_increasing");
     cmp["exp_aft"] = defaultExpire;
@@ -738,8 +738,8 @@ void setupHA()
 
     cmp = createComponent(cmps, "energy_air", "sensor", F("Air index"));
     cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ value_json.KWH_AIR | round(3) }}");
-    cmp[_unit_of_meas] = F("kWh");
+    cmp[_val_tpl] = F("{{ value_json.WH_AIR | round(3) }}");
+    cmp[_unit_of_meas] = F("Wh");
     cmp[_dev_cla] = F("energy");
     cmp["stat_cla"] = F("total_increasing");
     cmp["exp_aft"] = defaultExpire;
@@ -747,8 +747,8 @@ void setupHA()
     
     cmp = createComponent(cmps, "energy_jet", "sensor", F("Jets index"));
     cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ value_json.KWH_JET | round(3) }}");
-    cmp[_unit_of_meas] = F("kWh");
+    cmp[_val_tpl] = F("{{ value_json.WH_JET | round(3) }}");
+    cmp[_unit_of_meas] = F("Wh");
     cmp[_dev_cla] = F("energy");
     cmp["stat_cla"] = F("total_increasing");
     cmp["exp_aft"] = defaultExpire;
@@ -756,8 +756,8 @@ void setupHA()
 
     cmp = createComponent(cmps, "energy_idle", "sensor", F("Idle index"));
     cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ value_json.KWH_IDLE | round(3) }}");
-    cmp[_unit_of_meas] = F("kWh");
+    cmp[_val_tpl] = F("{{ value_json.WH_IDLE | round(3) }}");
+    cmp[_unit_of_meas] = F("Wh");
     cmp[_dev_cla] = F("energy");
     cmp["stat_cla"] = F("total_increasing");
     cmp["exp_aft"] = defaultExpire;
@@ -765,8 +765,8 @@ void setupHA()
 
     cmp = createComponent(cmps, "energy", "sensor", F("index"));
     cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ value_json.KWH | round(3) }}");
-    cmp[_unit_of_meas] = F("kWh");
+    cmp[_val_tpl] = F("{{ value_json.WH | round(3) }}");
+    cmp[_unit_of_meas] = F("Wh");
     cmp[_dev_cla] = F("energy");
     cmp["stat_cla"] = F("total_increasing");
     cmp["exp_aft"] = defaultExpire;
