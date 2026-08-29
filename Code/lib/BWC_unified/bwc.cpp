@@ -1075,9 +1075,14 @@ void BWC::_updateTimes(){
     float wattseconds = elapsedtime_ms * _energy_power_W * 0.001; //mWs -> Ws
     _energy_total_Ws += wattseconds;
     _energy_daily_Ws += wattseconds;
+    // Accumulate cost incrementally at the price in effect for *this* tick, rather
+    // than re-pricing the whole accumulated total at the current price - the price
+    // can change several times a day (off-peak/peak tariffs), and past consumption
+    // must keep the cost it was actually billed at.
     // Ws * price / kWh -> Ws * price / (3600 * 1000)
-    _energy_cost_total = _energy_total_Ws *_price / 3600000;
-    _energy_cost_daily = _energy_daily_Ws *_price / 3600000; 
+    double costIncrement = wattseconds * _price / 3600000;
+    _energy_cost_total += costIncrement;
+    _energy_cost_daily += costIncrement;
 
     if(_notes.size())
     {

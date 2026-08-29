@@ -5,12 +5,12 @@
   "pcb": "custom",
   "pins": [4, 5, 6, 7, 15, 16, 17, 0],
   "pwr_levels": {
-    "override": false,
-    "heater_stage1": 0,
-    "heater_stage2": 0,
-    "pump": 0,
-    "air": 0,
+    "override": true,
+    "heater_stage1": 1000,
+    "heater_stage2": 1000,
+    "pump": 38,
+    "air": 780,
     "idle": 0,
-    "jet": 0
+    "jet": 1100
   }
 }

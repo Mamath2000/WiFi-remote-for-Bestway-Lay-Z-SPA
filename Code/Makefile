@@ -20,9 +20,11 @@ upload:
 	pio run -e $(ENV) -t upload
 
 buildfs:
+	rm -rf data datazip
 	pio run -e $(ENV) -t buildfs
 
 uploadfs:
+	rm -rf data datazip
 	pio run -e $(ENV) -t uploadfs
 
 flash: upload uploadfs
