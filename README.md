@@ -1,73 +1,97 @@
-WiFi-remote-for-Bestway-Lay-Z-SPA
-=================================
-ESP8266 hack to use as WiFi remote control for Bestway Lay-Z-Spa Whirlpools (including 2021 year models) <br>
+WiFi remote for Bestway Lay-Z-SPA — fork Mamath2000
+====================================================
 
-Check out what is new i the release notes. (Link in the right column on this page - release version)<br>
-Also see the new [language support](README2.md) pulled into this rep by @dodemodexter
-=======
-Latest code found in [Development branch](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA/tree/development_v4)
-Build instructions and more: [Read the manual](bwc-manual.pdf)<br>
-Check out releasenotes by clicking the release version to the right on this page.<br>
+Fork de l'excellent projet original de [visualapproach](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA), qui transforme un ESP8266 (ou ESP32) en télécommande WiFi pour les spas gonflables Bestway Lay-Z-Spa.
 
-- [Features](#features)
-- [BOM](#bom)
-- [Web Interface](#web-interface)
-- [WiFi Module / Pump](#wifi-module--pump)
-- [Schematics](#schematics)
-- [Installation](#installation)
-- [Installation (Alternative)](#installation-alternative)
-- [Problems?](#problems)
+> Le projet original reste la référence pour le hardware (PCB, câblage, manuel de montage). Ce fork porte sur le firmware/logiciel : portage ESP32, simplification, intégration Home Assistant et refonte de l'interface web.
+
+- [Ce qui a changé dans ce fork](#ce-qui-a-changé-dans-ce-fork)
+- [Cibles de build](#cibles-de-build)
+- [Configuration persistante](#configuration-persistante)
+- [Documentation](#documentation)
+- [Hardware / build](#hardware--build)
+- [Disclaimer](#disclaimer)
 
 ---
 
-> #### Disclaimer
-> As mentioned, this is a hack. If anything breaks it is your fault.
+## Ce qui a changé dans ce fork
 
-> #### Caution
-> Pull out the mains plug before modifying hardware, or you can die!
+#### Portage ESP32
+Le firmware, initialement ESP8266 uniquement, compile et tourne maintenant sur ESP32 (ESP32-S3 et ESP32-DevKitC V4), en plus de la cible ESP8266 d'origine. Le portage a nécessité :
+- Remplacement des accès registre GPIO directs ESP8266 (`ports.h`) par les registres GPIO rapides ESP32 dans les ISR bit-bang CIO/DSP, pour tenir le timing serré du protocole avec le panneau du spa.
+- Fix du flood LEDC (`tone()`/`noTone()`) qui provoquait un boot loop sur ESP32.
+- Fix du handshake WebSocket qui ne se terminait jamais sur ESP32 (backend synchrone).
+- Un boot séquencé en étapes (WiFi → MQTT → découverte HA → vérification/lien spa → run) au lieu d'un enchaînement ad-hoc dans `loop()`.
+- Diagnostics de boot (raison de reset ESP32 publiée sur MQTT, pas juste en Serial) et un suivi d'état du lien spa (`binary_sensor spa_link`) affiché dans le footer web.
 
-> #### Donate
-> If you like this project, please consider a donation. [Buy me a coffee](https://paypal.me/TLandahl), thanks!
+Détails complets de l'investigation et des correctifs : [HANDOFF-esp32-boot-debug.md](Code/HANDOFF-esp32-boot-debug.md).
 
-#### Features
-- Control buttons, watch the temperature and get current states from your browser.
-- Custom text on the SPA pump display.
-- Custom sound instead of just beeping is possible.
-- OTA: Update firmware "over the air". Super convenient when mounted inside the pump.
-- Simple to build. No hardware changes needed on the SPA pump. Just remove the display, disconnect the 6- or 4-pin ribbon cable and plug it into this device.
-- Timer for chlorine addition and filter change. Hit the button on the web interface and it will count the days for you. (@Bankaifan)
-- Electricity cost estimation and more..
-- MQTT support! Now you can control the SPA from Home Assistant, OpenHab etc. (@faboaic, @877dev)
-- Schedule events like heater on/off at specific dates, with repeat functionality.
-- Listen to input signal on one pin and trigger a signal on another pin on desired events. For instance let solar panels turn on/off heater.
+#### Simplification des fonctionnalités
+Nettoyage des pages et fonctions peu utilisées ou redondantes de l'interface :
+- Suppression de la configuration de capteur ambiant (`hwconfig.html`).
+- Suppression des pages `webconfig.html`, `remove.html` et de la page de vérification des mises à jour firmware.
+- Sauvegarde de la configuration consolidée en une seule fonction `saveAll` au lieu de plusieurs formulaires séparés.
 
-#### BOM
-- ESP8266 NodeMCU 1.0 **(NOT for ESP32)**
-- 8 channel bidirectional level converter
-- 6 or 4 pin male header (0.1 in spacing) or better: JST-SM Housing Connector
-- 6 or 4 pin female header (JST-SM Housing Connector)
-see build instructions for more info.
+#### Découpage des sensors en device dans Home Assistant
+La découverte MQTT Home Assistant publie désormais plusieurs *devices* liés entre eux (via `via_device`) plutôt qu'un unique device fourre-tout :
+- **Tech** (device racine) — connectivité, diagnostics, lien spa.
+- **Commandes** — contrôle du spa (pompe, chauffage, air, jets…).
+- **Energie** — consommation, coût, temps de fonctionnement quotidiens (pompe/chauffage/air/jets).
+- **Temperature** — capteurs de température.
 
-#### Web Interface
-<img src="./pics/web01_overview.png" width="300"><br />
-<img src="./pics/web02_menu.png" width="300"><br />
-<img src="./pics/web03_spa-config.png" width="300"><br />
-<img src="./pics/web04_network-config.png" width="300"><br />
-<img src="./pics/web05_mqtt-config.png" width="300">
+Ce découpage donne une vue plus lisible côté HA (un device par usage) au lieu d'un empilement de dizaines d'entités sur une seule carte.
 
-#### WiFi Module / Pump
-<img src="./pics/pcb.jpg" width="300"><br />
-<img src="./pics/pump.jpg" width="300">
+#### Optimisation de l'IHM
+- CSS repensé en mobile-first.
+- Affichage pseudo-LCD et retouches d'icônes.
+- Libellés et tooltips plus clairs sur la configuration WiFi.
+- Page de debug avec viewer de logs live en WebSocket (`debug.html` / `debug.js`), utile pour diagnostiquer sans accès série (notamment sur le portage ESP32).
+- Support multilingue (6 langues : en, fr, es, it, de, pt) via des fichiers `.txt` éditables dans `/data`.
 
-#### Schematics
-It's in this project [PCB_V2B](https://oshwlab.com/visualapproach/bestway-wireless-controller-2_copy)
-Open the PCB tab and go to menu Fabrication, Gerber files. Order the PCB_V2B.
+#### Paramétrage persistant dans des fichiers de configuration
+La configuration est stockée dans des fichiers JSON en LittleFS, éditables via l'IHM ou préchargés dans `data_base/` avant l'upload du filesystem :
+- `wifi.json` — SSID/mot de passe, IP statique optionnelle, NTP.
+- `mqtt.json` — hôte, credentials, topic de base, intervalle de télémétrie.
+- `hwcfg.json` — modèle CIO/DSP, PCB, pins, niveaux de puissance par mode.
+- `settings.json` — prix du kWh, audio, restauration d'état.
 
-#### Installation
-Build instructions and more: [Instructions](bwc-manual.pdf)
-Technical details in the [Documentation](bwc_docs.xlsx).
+#### Autres améliorations notables
+- Calcul du coût énergétique basé sur la puissance nominale du chauffage, avec point de sauvegarde périodique des compteurs accumulés.
+- Suivi des temps de fonctionnement quotidiens (pompe, chauffage, air, jets).
+- Log MQTT structuré (`bwcLog`, topic `<base>/log`) avec niveau info/debug togglable à chaud depuis un switch HA (`<base>/log_level`) — pas besoin d'accès série pour diagnostiquer.
+- Sélection automatique du meilleur point d'accès WiFi parmi les AP connus avant connexion.
+- Fix d'une lecture non bornée du payload MQTT sur `/command`, `/command_batch`, `/set_config`, `/log_level`.
+- Cache-Control (max-age=3600) sur les fichiers statiques servis, réduisant la charge réseau de l'IHM.
 
-@misterpeee's wife made and shared this case for 3d printing https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA/discussions/265#discussion-4062382 but it's for the PCB_V1 which is deprecated. Latest PCB is PCB_V2B.
+## Cibles de build
 
-#### Problems?
-Read the [FAQ](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA/discussions/46), other [discussions](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA/discussions) and current [issues](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA/issues).
+Trois environnements PlatformIO :
+- `nodemcuv2` — ESP8266 d'origine.
+- `esp32s3-devkitc1u-n16r8` — ESP32-S3 (cible principale de ce fork, testée sur matériel réel).
+- `esp32-devkitc-v4` — ESP32 classique (WROOM-32U), câblage documenté mais non validé matériel.
+
+Un `Makefile` expose les commandes courantes (`make build`, `make upload`, `make buildfs`, `make flash`, `make monitor` — voir `make help`). Override de la cible avec `ENV=nodemcuv2 make ...`.
+
+## Configuration persistante
+
+Voir [notes.md](notes.md) pour le détail des fichiers `wifi.json`/`mqtt.json`, le fonctionnement de l'OTA (firmware + filesystem), et des conseils de dépannage WiFi (notamment avec des AP Unifi).
+
+## Documentation
+
+Documentation technique du portage dans [Code/docs/](Code/docs/) (Docusaurus) :
+- [Migration ESP8266 → ESP32-S3](<Code/docs/Migration ESP8266 -ESP32-S3.md>)
+- [Migration ESP8266 → ESP32-DevKitC V4](<Code/docs/Migration ESP8266 - ESP32-DevKitC-V4.md>)
+
+## Hardware / build
+
+Pour le hardware (BOM, schématiques, PCB, câblage), se référer au [projet original](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA) et à son [manuel de montage](bwc-manual.pdf) — aucune modification hardware n'est apportée par ce fork au-delà du support ESP32 (mêmes contraintes de câblage, adapter le brochage selon la carte utilisée, voir la doc de migration ci-dessus).
+
+## Disclaimer
+
+> Comme le projet original : c'est un hack. En cas de casse, c'est votre responsabilité.
+
+> Débranchez le secteur avant toute modification hardware, sous peine de danger électrique.
+
+---
+
+Crédits : projet original par [visualapproach](https://github.com/visualapproach/WiFi-remote-for-Bestway-Lay-Z-SPA), support i18n/UI initial par [dodemodexter](README2.md).
