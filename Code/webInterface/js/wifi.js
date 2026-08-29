@@ -11,6 +11,7 @@ function loadNetworkConfig() {
             document.getElementById('enableAp').checked        = !!json.enableAp;
             document.getElementById('apSsid').value            = json.apSsid    || '';
             document.getElementById('apPwd').value             = json.apPwd     || '';
+            onEnableApClick();
             document.getElementById('enableWM').checked        = !!json.enableWM;
 
             document.getElementById('enableStaticIp4').checked = !!json.enableStaticIp4;
@@ -24,8 +25,14 @@ function loadNetworkConfig() {
     }
 }
 
+function onEnableApClick() {
+    var checked = document.getElementById('enableAp').checked;
+    document.getElementById('apSsid').disabled = !checked;
+    document.getElementById('apPwd').disabled = !checked;
+}
+
 function saveNetworkConfig() {
-    if (!validatePassword('apPwd')) return;
+    if (document.getElementById('enableAp').checked && !validatePassword('apPwd')) return;
 
     buttonConfirm(
     document.getElementById('save'),

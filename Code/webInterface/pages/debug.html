@@ -1,0 +1,62 @@
+{% extends "../layout.html" %}
+
+{% block header_headline_title %}
+<span data-i18n="menu_debug">Debug</span>
+{% endblock %}
+
+{% block top_navigation %}
+{% run use_component("topNavigation", "debug") %}
+{% endblock %}
+
+{% block content %}
+<section>
+  <table>
+    <tr>
+      <td>
+        <label for="mqttDebug" data-i18n="label_mqtt_debug">Debug logging over MQTT:</label>
+        <span class="tooltip" data-text="Publishes debug-level log lines to the &quot;&lt;base&gt;/log&quot; MQTT topic, in addition to info/error which always go out."
+          data-i18n="[data-text]tooltip_mqtt_debug">?</span>
+      </td>
+      <td>
+        <input type="checkbox" id="mqttDebug">
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <label for="webDebug" data-i18n="label_web_debug">Debug logging in this page:</label>
+        <span class="tooltip" data-text="Streams debug-level log lines to the live log below, in addition to info/error which always show."
+          data-i18n="[data-text]tooltip_web_debug">?</span>
+      </td>
+      <td>
+        <input type="checkbox" id="webDebug">
+      </td>
+    </tr>
+  </table>
+</section>
+
+<section>
+  <table>
+    <tr>
+      <td colspan="2" style="text-align:center">
+        <button id="save" class="button" onclick="saveDebugConfig()" data-i18n="button_save">save</button>
+      </td>
+    </tr>
+  </table>
+</section>
+
+<section>
+  <h2 data-i18n="section_live_log">Live log:</h2>
+  <div id="logbox" class="logbox"></div>
+  <table>
+    <tr>
+      <td colspan="2" style="text-align:center">
+        <button id="clearlog" class="button_red" onclick="clearLog()" data-i18n="btn_clear_log">clear</button>
+      </td>
+    </tr>
+  </table>
+</section>
+{% endblock %}
+
+{% block embed_scripts %}
+{% run embed_scripts('debug') %}
+{% endblock %}

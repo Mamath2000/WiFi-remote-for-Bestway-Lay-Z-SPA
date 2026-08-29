@@ -34,18 +34,6 @@
     </tr>
     <tr>
       <td>
-        <!-- 2) Un span dédié au texte « Virtual: » / « Virtuel : » -->
-        <span data-i18n="label_virtual">Virtual:</span>
-
-        <!-- 3) La bulle « ? » en dehors du span de traduction -->
-        <span class="tooltip"
-          data-text="ESP attempts to keep track of water temperature even when pump is stopped and the temperature drops in the pump while the large body of water cools slower. Uses ambient temperature. Must be calibrated before working. See SPA Config page."
-          data-i18n="[data-text]tooltip_virtual">?</span>
-      </td>
-      <td><span id="vtlabel">n/a</span></td>
-    </tr>
-    <tr>
-      <td>
         <span data-i18n="label_target">Target:</span>
       </td>
       <td><span id="ttlabel">n/a</span></td>
@@ -57,7 +45,7 @@
 <section id="sectionControl">
   <h2 data-i18n="section_control_title">Control</h2>
 
-  <table id="tableSlider">
+  <table id="tableSlider" style="display:none">
     <tr>
       <td><span data-i18n="control_temp">Temperature</span></td>
       <td>
@@ -65,14 +53,6 @@
           ontouchend="sendCommand('setTarget')">
       </td>
       <td style="width:10%; text-align:right" id="sliderTempVal">n/a</td>
-    </tr>
-    <tr>
-      <td><span data-i18n="control_ambient">Ambient Temperature</span></td>
-      <td>
-        <input type="range" id="amb" min="-40" max="60" step="1" value="20" onmouseup="sendCommand('setAmbient')"
-          ontouchend="sendCommand('setAmbient')">
-      </td>
-      <td style="text-align:right" id="sliderAmbVal">n/a</td>
     </tr>
     <tr id="rowBrightness">
       <td>
@@ -95,7 +75,6 @@
   <table id="tableSelector" class="fixed">
     <tr>
       <td class="center"><span data-i18n="control_temp">Temperature</span></td>
-      <td class="center"><span data-i18n="control_ambient">Ambient Temperature</span></td>
       <td id="brightnessHeader" class="center">
         <!-- même principe pour la version sélecteur numérique -->
         <span data-i18n="control_brightness">Brightness</span>
@@ -115,19 +94,6 @@
             <span class="numDisplay"></span>
           </div>
           <button onclick="decreaseNumber('selectorTemp'); sendCommand('setTargetSelector')"
-            class="selectorbutton selectorbottom">ᐯ</button>
-        </div>
-      </td>
-      <td class="center">
-        <div class="selector">
-          <button onclick="increaseNumber('selectorAmb'); sendCommand('setAmbientSelector')"
-            class="selectorbutton selectortop">ᐱ</button>
-          <input style="display:none" type="number" id="selectorAmb" min="-40" max="60" step="1" value="20"
-            class="selectorvalue" onchange="sendCommand('setAmbientSelector')">
-          <div class="wrapper">
-            <span class="numDisplay"></span>
-          </div>
-          <button onclick="decreaseNumber('selectorAmb'); sendCommand('setAmbientSelector')"
             class="selectorbutton selectorbottom">ᐯ</button>
         </div>
       </td>
@@ -200,57 +166,6 @@
   </table>
 </section>
 
-<!-- ==================== SECTION: Timer ==================== -->
-<section id="sectionTimer">
-  <h2 data-i18n="section_timer_title">Timer</h2>
-  <table>
-    <tr>
-      <td>
-        <span data-i18n="tim_label_chlorine">
-          Last chlorine add was <span id="cltimer">n/a</span> ago.
-        </span>
-      </td>
-      <td>
-        <button id="cltimerbtn" class="button" onclick="buttonConfirm(this); sendCommand('resetTimerChlorine')"
-          data-i18n="btn_reset">reset</button>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <span data-i18n="tim_label_filter_change">
-          Last filter change was <span id="freplacetimer">n/a</span> ago.
-        </span>
-      </td>
-      <td>
-        <button id="freplacetimerbtn" class="button"
-          onclick="buttonConfirm(this); sendCommand('resetTimerReplaceFilter')" data-i18n="btn_reset">reset</button>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <span data-i18n="tim_label_filter_clean">
-          Last filter clean was <span id="fcleantimer">n/a</span> ago.
-        </span>
-      </td>
-      <td>
-        <button id="fcleantimerbtn" class="button" onclick="buttonConfirm(this); sendCommand('resetTimerCleanFilter')"
-          data-i18n="btn_reset">reset</button>
-      </td>
-    </tr>
-    <tr>
-      <td>
-        <span data-i18n="tim_label_filter_rinse">
-          Last filter rinse was <span id="frinsetimer">n/a</span> ago.
-        </span>
-      </td>
-      <td>
-        <button id="frinsetimerbtn" class="button" onclick="buttonConfirm(this); sendCommand('resetTimerRinseFilter')"
-          data-i18n="btn_reset">reset</button>
-      </td>
-    </tr>
-  </table>
-</section>
-
 <!-- ==================== SECTION: Totals ==================== -->
 <section id="sectionTotals">
   <h2 data-i18n="section_totals_title">Totals</h2>
@@ -265,46 +180,6 @@
           data-i18n="[data-text]tooltip_time">?</span>
       </td>
       <td><span id="time">n/a</span></td>
-    </tr>
-    <tr>
-      <td>
-        <span data-i18n="totals_ready_label">
-          Ready in:
-        </span>
-        <!-- Bul “?” pour “Ready in” -->
-        <span class="tooltip"
-          data-text="New way of estimating time to ready. Works best if given actual ambient temperature from for example HA."
-          data-i18n="[data-text]tooltip_ready">?</span>
-      </td>
-      <td><span id="t2r">n/a</span></td>
-    </tr>
-    <tr>
-      <td>
-        <span data-i18n="totals_uptime_label">
-          Uptime:
-        </span>
-        <!-- Bul “?” pour “Uptime” -->
-        <span class="tooltip"
-          data-text="Total running time of ESP since counter was reset. Rebooting will continue counting."
-          data-i18n="[data-text]tooltip_uptime">?</span>
-      </td>
-      <td><span id="uptime">n/a</span></td>
-    </tr>
-    <tr>
-      <td data-i18n="totals_pump_label">Pump:</td>
-      <td><span id="filtertime">n/a</span></td>
-    </tr>
-    <tr>
-      <td data-i18n="totals_heating_label">Heating:</td>
-      <td><span id="heatingtime">n/a</span></td>
-    </tr>
-    <tr>
-      <td data-i18n="totals_air_label">Air:</td>
-      <td><span id="airtime">n/a</span></td>
-    </tr>
-    <tr id="jetstotals">
-      <td data-i18n="totals_hydrojets_label">Hydrojets:</td>
-      <td><span id="jettime">n/a</span></td>
     </tr>
     <tr>
       <td data-i18n="totals_cost_label">Estimated cost:</td>

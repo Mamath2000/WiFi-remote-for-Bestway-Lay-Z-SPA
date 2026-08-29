@@ -11,10 +11,6 @@ BWC::BWC()
     //Initialize variables
 
     _dsp_brightness = 7;
-    _cl_timestamp_s = time(nullptr);
-    _filter_replace_timestamp_s = time(nullptr);
-    _filter_clean_timestamp_s = _filter_replace_timestamp_s;
-    _filter_rinse_timestamp_s = _filter_replace_timestamp_s;
     _uptime = 0;
     _pumptime = 0;
     _heatingtime = 0;
@@ -31,14 +27,8 @@ BWC::BWC()
     _uptime_daily_ms = 0;
     _last_reset_day = 0;
     _price = 1.0;
-    _filter_rinse_interval = 7;
-    _filter_clean_interval = 20;
-    _filter_replace_interval = 60;
-    _cl_interval = 14;
     _audio_enabled = true;
     _restore_states_on_start = false;
-    _ambient_temp = 20;
-    _virtual_temp_fix = -99;
 }
 
 BWC::~BWC()
@@ -190,7 +180,6 @@ void BWC::setup(void){
     cio->setPowerLevels(power_levels);
     
     dsp->setup(pins[3], pins[4], pins[5], pins[6]);
-    tempSensorPin = pins[7];
     hasjets = cio->getHasjets();
     hasgod = cio->getHasgod();
     cio->cio_toggles.power_change = 1;
@@ -204,7 +193,6 @@ void BWC::begin(){
     _save_settings_ticker.attach(3600.0f, save_settings_cb, this);
     _scroll_text_ticker.attach(0.25f, scroll_text_cb, this);
 
-    _next_notification_time = _notification_time;
     loadCommandQueue();
     _loadSettings();
 }
@@ -259,9 +247,7 @@ void BWC::loop(){
     if(_save_settings_needed) saveSettings();
     if(_save_cmdq_needed) _saveCommandQueue();
     if(_save_states_needed) _saveStates();
-    _handleNotification();
     _handleStateChanges();
-    _calcVirtualTemp();
     _updateSpaLinkHealth();
     // logstates();
     if(BWC_DEBUG) _log();
@@ -366,15 +352,15 @@ void BWC::play_sound()
         switch(dsp->dsp_toggles.pressed_button)
         {
             case UP:
-                if(dsp->EnabledButtons[UP]) _sweepup();
+                _sweepup();
                 _dsp_tgt_used = true;
                 break;
             case DOWN:
-                if(dsp->EnabledButtons[DOWN]) _sweepdown();
+                _sweepdown();
                 _dsp_tgt_used = true;
                 break;
             case TIMER:
-                if(dsp->EnabledButtons[TIMER]) _beep();
+                _beep();
                 break;
             default:
 
@@ -435,34 +421,30 @@ bool BWC::_compare_command(const command_que_item& i1, const command_que_item& i
     return i1.xtime < i2.xtime;
 }
 
-void BWC::_handleNotification()
-{
-    /* user don't want a notification*/
-    if(!_notify) return;
-    /* there is no upcoming command*/
-    if(_command_que.size() == 0)
-    {
-        _next_notification_time = _notification_time;
-        return;
-    }
-    /* not the time yet*/
-    int timetogo = _command_que[0].xtime - _timestamp_secs;
-    if(timetogo >= _next_notification_time) return;
-    /* only _notify for these commands*/
-    if(!(_command_que[0].cmd == SETBUBBLES || _command_que[0].cmd == SETHEATER || _command_que[0].cmd == SETJETS || _command_que[0].cmd == SETPUMP)) return;
 
-    if(_audio_enabled) _sweepup();
-    dsp->text += "  -" + String(_next_notification_time) + "-";
-    BWC_LOG_P(PSTR("Notification: %d\n"), _next_notification_time);
-    // dsp->dsp_states.text = "i-i-";
-    if(timetogo < 4)
-        _next_notification_time = -10; //postpone "alarm" until after the command xtime (will be reset on command execution)
-    else
-        while (_next_notification_time > timetogo) //sometimes automations throw in an instant command that resets the counter.
-        {
-            _next_notification_time /= 2;
-            if(_next_notification_time < 4) break; //avoid infinite loop
-        }
+static const char* commandName(Commands cmd)
+{
+    switch(cmd)
+    {
+        case SETTARGET: return "SETTARGET";
+        case SETUNIT: return "SETUNIT";
+        case SETBUBBLES: return "SETBUBBLES";
+        case SETHEATER: return "SETHEATER";
+        case SETPUMP: return "SETPUMP";
+        case RESETQ: return "RESETQ";
+        case REBOOTESP: return "REBOOTESP";
+        case GETTARGET: return "GETTARGET";
+        case RESETTIMES: return "RESETTIMES";
+        case SETJETS: return "SETJETS";
+        case SETBRIGHTNESS: return "SETBRIGHTNESS";
+        case SETBEEP: return "SETBEEP";
+        case RESETDAILY: return "RESETDAILY";
+        case SETGODMODE: return "SETGODMODE";
+        case SETFULLPOWER: return "SETFULLPOWER";
+        case PRINTTEXT: return "PRINTTEXT";
+        case SETPOWER: return "SETPOWER";
+        default: return "UNKNOWN";
+    }
 }
 
 void BWC::_handleCommandQ() {
@@ -476,7 +458,8 @@ void BWC::_handleCommandQ() {
         while(_command_que[0].xtime <= _timestamp_secs)
             _command_que[0].xtime += _command_que[0].interval;
        _command_que.push_back(_command_que[0]);
-    } 
+    }
+    bwcLog(LOGLVL_INFO, "CMD", "%s val=%lld", commandName(_command_que[0].cmd), (long long)_command_que[0].val);
     _handlecommand(_command_que[0].cmd, _command_que[0].val, _command_que[0].text);
 }
 
@@ -523,7 +506,6 @@ bool BWC::_handlecommand(Commands cmd, int64_t val, const String& txt="")
     case RESETQ:
         _command_que.clear();
         _save_cmdq_needed = true;
-        _next_notification_time = _notification_time; //reset alarm time
         return false;
         break;
     case REBOOTESP:
@@ -555,26 +537,6 @@ bool BWC::_handlecommand(Commands cmd, int64_t val, const String& txt="")
         _save_settings_needed = true;
         _new_data_available = true;
         break;
-    case RESETCLTIMER:
-        _cl_timestamp_s = _timestamp_secs;
-        _save_settings_needed = true;
-        _new_data_available = true;
-        break;
-    case RESETFREPLACETIMER:
-        _filter_replace_timestamp_s = _timestamp_secs;
-        _save_settings_needed = true;
-        _new_data_available = true;
-        break;
-    case RESETFCLEANTIMER:
-        _filter_clean_timestamp_s = _timestamp_secs;
-        _save_settings_needed = true;
-        _new_data_available = true;
-        break;
-    case RESETFRINSETIMER:
-        _filter_rinse_timestamp_s = _timestamp_secs;
-        _save_settings_needed = true;
-        _new_data_available = true;
-        break;
     case SETJETS:
         if(val != cio->cio_states.jets) cio->cio_toggles.jets_change = 1;
         break;
@@ -589,14 +551,6 @@ bool BWC::_handlecommand(Commands cmd, int64_t val, const String& txt="")
         if(val == 0) _beep();
         else if(val == 1) _accord();
         else _load_melody_json(txt);
-        break;
-    case SETAMBIENTF:
-        setAmbientTemperature(val, false);
-        _new_data_available = true;
-        break;
-    case SETAMBIENTC:
-        setAmbientTemperature(val, true);
-        _new_data_available = true;
         break;
     case RESETDAILY:
         _energy_daily_Ws = 0;
@@ -617,38 +571,6 @@ bool BWC::_handlecommand(Commands cmd, int64_t val, const String& txt="")
         cio->cio_toggles.no_of_heater_elements_on = val+1;
         break;
     /*PRINTTEXT is not a command per se. Every command prints the txt string, and if we ONLY want to print txt we do nothing to the command.*/
-    case SETREADY:
-        {
-            command_que_item item;
-            if((int64_t)_timestamp_secs > (int64_t)(val - _estHeatingTime() * 3600.0f - 7200)) //2 hours extra margin
-            {
-                /*time to start heating*/
-                item.cmd = SETHEATER;
-                item.interval = 0;
-                item.text = "";
-                item.val = 1;
-                item.xtime = _timestamp_secs + 1;
-                add_command(item);
-            }
-            else
-            {
-                /*Not time yet, so add check in one minute*/
-                item.cmd = cmd;
-                item.interval = 0;
-                item.text = "";
-                item.val = val;
-                item.xtime = _timestamp_secs + 60;
-                /*We can't use addcommand() because it will copy xtime to val again*/
-                _command_que.push_back(item);
-                std::sort(_command_que.begin(), _command_que.end(), _compare_command);
-            }
-        }
-        break;
-    case SETR:
-        _R_COOLING = val/1000000.0f;
-        _vt_calibrated = true;
-        _save_settings_needed = true;
-        break;
     case SETPOWER:
         val = std::clamp((int)val, 0, 1);
         cio->cio_toggles.power_change = (val != cio->cio_states.power);
@@ -658,7 +580,6 @@ bool BWC::_handlecommand(Commands cmd, int64_t val, const String& txt="")
     }
     //remove from commandQ
     _command_que.erase(_command_que.begin());
-    _next_notification_time = _notification_time; //reset alarm time
     _save_cmdq_needed = true;
     if(restartESP) {
         saveSettings();
@@ -733,31 +654,8 @@ void BWC::_format_text(const String &txt)
 void BWC::_handleStateChanges()
 {
     if(_prev_cio_states != cio->cio_states || _prev_dsp_states.brightness != dsp->dsp_states.brightness) _new_data_available = true;
-    if(cio->cio_states.temperature != _prev_cio_states.temperature)
-    {
-        _deltatemp = cio->cio_states.temperature - _prev_cio_states.temperature;
-        _updateVirtualTempFix_ontempchange();
-        _temp_change_timestamp_ms = millis();
-    }
 
-    // Store virtual temp data point
-    if(cio->cio_states.heatred != _prev_cio_states.heatred)
-    {
-        _heatred_change_timestamp_ms = millis();
-        _updateVirtualTempFix_onheaterchange();
-    }
-
-    if(cio->cio_states.pump != _prev_cio_states.pump)
-    {
-        _pump_change_timestamp_ms = millis();
-    }
-
-    if(cio->cio_states.bubbles != _prev_cio_states.bubbles)
-    {
-        _bubbles_change_timestamp_ms = millis();
-    }
-
-    if((cio->cio_states.locked != _prev_cio_states.locked) && dsp->EnabledButtons[LOCK] && _audio_enabled && (dsp->dsp_toggles.pressed_button == LOCK))
+    if((cio->cio_states.locked != _prev_cio_states.locked) && _audio_enabled && (dsp->dsp_toggles.pressed_button == LOCK))
     {
         _beep();
     }
@@ -785,164 +683,6 @@ void BWC::_handleStateChanges()
     /* check changes from DSP 4W - go to antigodmode if someone presses a button*/
 }
 
-// return how many hours until pool is ready. (provided the heater is on)
-float BWC::_estHeatingTime()
-{
-    int targetInC = cio->cio_states.target;
-    if(!cio->cio_states.unit) targetInC = F2C(targetInC);
-    if(_virtual_temp > targetInC) return -2;  //Already
-
-    // float degAboveAmbient = _virtual_temp - (float)_ambient_temp;
-    // float fraction = 1.0f - (degAboveAmbient - floor(degAboveAmbient));
-    // int deltaTemp = targetInC - _virtual_temp;
-
-    // //integrate the time needed to reach target
-    // //how long to next integer temp
-    // double coolingPerHour = degAboveAmbient / _R_COOLING;
-    // double netRisePerHour;
-    // netRisePerHour = _heating_degperhour - coolingPerHour;
-
-    // double hoursRemaining = fraction / netRisePerHour;
-
-    double degAboveAmbient;
-    double deltaTemp = targetInC - _virtual_temp;
-    double coolingPerHour;
-    double netRisePerHour;
-    double hoursRemaining = 0;
-    //iterate up to target
-    for(float i = 0; i <= deltaTemp; i += 0.01)
-    {
-        degAboveAmbient = _virtual_temp + i - _ambient_temp;
-        coolingPerHour = degAboveAmbient / _R_COOLING;
-        netRisePerHour = _heating_degperhour - coolingPerHour;
-        if(netRisePerHour <= 0) return -1; //Never
-        hoursRemaining += 0.01 / netRisePerHour;
-    }
-
-    if(hoursRemaining >= 0)
-        return hoursRemaining;
-    else 
-        return -1; //Never
-}
-
-//virtual temp is always C in this code and will be converted when sending externally
-void BWC::_calcVirtualTemp()
-{
-    //startup init
-    if(millis() < 30000)
-    {
-        int tempInC = cio->cio_states.temperature;
-        if(!cio->cio_states.unit) {
-            tempInC = F2C(tempInC);
-        }
-        _virtual_temp_fix = tempInC;
-        _virtual_temp = _virtual_temp_fix;
-        _virtual_temp_fix_age = 0;
-        return;
-    }
-
-    // calculate from last updated VTFix.
-    double netRisePerHour;
-    float degAboveAmbient = _virtual_temp - _ambient_temp;
-    double coolingPerHour = degAboveAmbient / _R_COOLING;
-
-    if(cio->cio_states.heatred)
-    {
-        netRisePerHour = _heating_degperhour - coolingPerHour;
-    }
-    else
-    {
-        netRisePerHour = - coolingPerHour;
-    }
-    double elapsed_hours = _virtual_temp_fix_age / 3600.0 / 1000.0;
-    float newvt = _virtual_temp_fix + netRisePerHour * elapsed_hours;
-
-    // clamp VT to +/- 1 from measured temperature if pump is running
-    if(cio->cio_states.pump && ((millis()-_pump_change_timestamp_ms) > 5*60000))
-    {
-        float tempInC = cio->cio_states.temperature;
-        float limit = 0.99;
-        if(!cio->cio_states.unit)
-        {
-            tempInC = F2C(tempInC);
-            limit = 1/1.8;
-        }
-        float dev = newvt-tempInC;
-        if(dev > limit) dev = limit;
-        if(dev < -limit) dev = -limit;
-        newvt = tempInC + dev;
-    }
-
-    // Rebase start of calculation from new integer temperature
-    if(int(_virtual_temp) != int(newvt))
-    {
-        _virtual_temp_fix = newvt;
-        _virtual_temp_fix_age = 0;
-    }
-    _virtual_temp = newvt;
-
-    /* Using Newtons law of cooling
-        T(t) = Tenv + (T(0) - Tenv)*e^(-t/r)
-        r = -t / ln( (T(t)-Tenv) / (T(0)-Tenv) )
-        dT/dt = (T(t) - Tenv) / r
-        ----------------------------------------
-        T(t) : Temperature at time t
-        Tenv : _ambient_temp (considered constant)
-        T(0) : Temperature at time 0 (_virtual_temp_fix)
-        e    : natural number 2,71828182845904
-        r    : a constant we need to find out by measurements
-    */
-   BWC_YIELD;
-}
-
-//Called on temp change
-void BWC::_updateVirtualTempFix_ontempchange()
-{
-    int tempInC = cio->cio_states.temperature;
-    float conversion = 1;
-    if(!cio->cio_states.unit) {
-        tempInC = F2C(tempInC);
-        conversion = 1/1.8;
-    }
-    //Do not process if temperature changed > 1 degree (reading spikes)
-    if(abs(_deltatemp) != 1) return;
-
-    //readings are only valid if pump is running and has been running for 5 min.
-    if(!cio->cio_states.pump || ((millis()-_pump_change_timestamp_ms) < 5*60000)) return;
-
-    _virtual_temp = tempInC;
-    _virtual_temp_fix = tempInC;
-    _virtual_temp_fix_age = 0;
-    /*
-    update_coolingDegPerHourArray
-    Measured temp has changed by 1 degree over a certain time
-    1 degree/(temperature age in ms / 3600 / 1000)hours = 3 600 000 / temperature age in ms
-    */
-
-    // We can only know something about rate of change if we had continous cooling since last update
-    // (Nobody messed with the heater during the 1 degree change)
-    if(_heatred_change_timestamp_ms > _temp_change_timestamp_ms) return; //bugfix by @cobaltfish
-    // rate of heating is not subject to change (fixed wattage and pool size) so do this only if cooling
-    // and do not calibrate if bubbles has been on
-    if(_vt_calibrated) return;
-    if(cio->cio_states.heatred || cio->cio_states.bubbles || (_bubbles_change_timestamp_ms > _temp_change_timestamp_ms)) return;
-    if(_deltatemp > 0 && _virtual_temp > _ambient_temp) return; //temp is rising when it should be falling. Bail out
-    if(_deltatemp < 0 && _virtual_temp < _ambient_temp) return; //temp is falling when it should be rising. Bail out
-    float degAboveAmbient = _virtual_temp - _ambient_temp;
-    // can't calibrate if ambient ~ virtualtemp
-    if(abs(degAboveAmbient) <= 1) return;
-    _R_COOLING = ((millis()-_temp_change_timestamp_ms)/3600000.0) / log((conversion*degAboveAmbient) / (conversion*(degAboveAmbient + _deltatemp)));
-    _vt_calibrated = true;
-    _save_settings_needed = true;
-}
-
-//Called on heater state change
-void BWC::_updateVirtualTempFix_onheaterchange()
-{
-    _virtual_temp_fix = _virtual_temp;
-    _virtual_temp_fix_age = 0;
-}
-
 void BWC::print(const String &txt)
 {
     dsp->text += txt;
@@ -963,15 +703,6 @@ void BWC::print(const String &txt)
 //     return res;
 // }
 
-void BWC::setAmbientTemperature(int64_t amb, bool unit)
-{
-    _ambient_temp = (int)amb;
-    if(!unit) _ambient_temp = F2C(_ambient_temp);
-
-    _virtual_temp_fix = _virtual_temp;
-    _virtual_temp_fix_age = 0;
-}
-
 String BWC::getModel()
 {
     return cio->getModel();
@@ -980,12 +711,6 @@ String BWC::getModel()
 bool BWC::add_command(command_que_item command_item)
 {
     _save_cmdq_needed = true;
-    if(command_item.cmd == SETREADY)
-    {
-        command_item.val = (int64_t)command_item.xtime; //Use val field to store the time to be ready
-        command_item.xtime = 0; //And start checking now
-        command_item.interval = 0;
-    }
     //add parameters to _command_que[rows][parameter columns] and sort the array on xtime.
     _command_que.push_back(command_item);
     std::sort(_command_que.begin(), _command_que.end(), _compare_command);
@@ -997,12 +722,6 @@ bool BWC::edit_command(uint8_t index, command_que_item command_item)
 {
     if(index > _command_que.size()) return false;
     _save_cmdq_needed = true;
-    if(command_item.cmd == SETREADY)
-    {
-        command_item.val = (int64_t)command_item.xtime; //Use val field to store the time to be ready
-        command_item.xtime = 0; //And start checking now
-        command_item.interval = 0;
-    }
     //add parameters to _command_que[index] and sort the array on xtime.
     _command_que.at(index) = command_item;
     std::sort(_command_que.begin(), _command_que.end(), _compare_command);
@@ -1061,31 +780,21 @@ void BWC::getJSONStates(String &rtn) {
     doc[F("GOD")] = (uint8_t)cio->cio_states.godmode;
     doc[F("TGT")] = cio->cio_states.target;
     doc[F("TMP")] = cio->cio_states.temperature;
-    doc[F("VTMC")] = _virtual_temp;
-    doc[F("VTMF")] = C2F(_virtual_temp);
-    doc[F("AMBC")] = _ambient_temp;
-    doc[F("AMBF")] = round(C2F(_ambient_temp));
     if(cio->cio_states.unit)
     {
         //celsius
-        doc[F("AMB")] = _ambient_temp;
-        doc[F("VTM")] = _virtual_temp;
         doc[F("TGTC")] = cio->cio_states.target;
         doc[F("TMPC")] = cio->cio_states.temperature;
         doc[F("TGTF")] = round(C2F((float)cio->cio_states.target));
         doc[F("TMPF")] = round(C2F((float)cio->cio_states.temperature));
-        // doc[F("VTMF")] = C2F(_virtual_temp);
     }
     else
     {
         //farenheit
-        doc[F("AMB")] = round(C2F(_ambient_temp));
-        doc[F("VTM")] = C2F(_virtual_temp);
         doc[F("TGTF")] = cio->cio_states.target;
         doc[F("TMPF")] = cio->cio_states.temperature;
         doc[F("TGTC")] = round(F2C((float)cio->cio_states.target));
         doc[F("TMPC")] = round(F2C((float)cio->cio_states.temperature));
-        // doc[F("VTMC")] = _virtual_temp;
     }
 
     // Serialize JSON to string
@@ -1108,10 +817,6 @@ void BWC::getJSONTimes(String &rtn) {
     // Set the values in the document
     doc[F("CONTENT")] = F("TIMES");
     doc[F("TIME")] = _timestamp_secs;
-    doc[F("CLTIME")] = _cl_timestamp_s;
-    doc[F("FREP")] = _filter_replace_timestamp_s;
-    doc[F("FRIN")] = _filter_rinse_timestamp_s;
-    doc[F("FCLE")] = _filter_clean_timestamp_s;
     doc[F("UPTIME")] = _uptime + _uptime_ms/1000;
     doc[F("PUMPTIME")] = _pumptime + _pumptime_ms/1000;
     doc[F("HEATINGTIME")] = _heatingtime + _heatingtime_ms/1000;
@@ -1124,19 +829,9 @@ void BWC::getJSONTimes(String &rtn) {
     doc[F("JETTIME")] = _jettime + _jettime_ms/1000;
     doc[F("COST")] = _energy_cost_total;
     doc[F("COSTD")] = _energy_cost_daily;
-    doc[F("FREPI")] = _filter_replace_interval;
-    doc[F("FRINI")] = _filter_rinse_interval;
-    doc[F("FCLEI")] = _filter_clean_interval;
-    doc[F("CLINT")] = _cl_interval;
     doc[F("KWH")] = _energy_total_Ws / 3600000.0; //Ws -> kWh
     doc[F("KWHD")] = _energy_daily_Ws / 3600000.0; //Ws -> kWh
     doc[F("WATT")] = _energy_power_W;
-    float t2r = _estHeatingTime();
-    String t2r_string = F("Not ready");
-    if(t2r == -2) t2r_string = F("Ready");
-    if(t2r == -1) t2r_string = F("Never");
-    doc[F("T2R")] = t2r;
-    doc[F("RS")] = t2r_string;
     /* DMI = max Display Messages Interval */
     doc[F("DMI")] = dsp->max_time_between_transmissions_ms;
     dsp->max_time_between_transmissions_ms = 0;
@@ -1168,31 +863,15 @@ void BWC::getJSONSettings(String &rtn){
     // Set the values in the document
     doc[F("CONTENT")] = F("SETTINGS");
     doc[F("PRICE")] = _price;
-    doc[F("FREPI")] = _filter_replace_interval;
-    doc[F("FRINI")] = _filter_rinse_interval;
-    doc[F("FCLEI")] = _filter_clean_interval;
-    doc[F("CLINT")] = _cl_interval;
     doc[F("AUDIO")] = _audio_enabled;
     #ifdef ESP8266
     doc[F("REBOOTINFO")] = ESP.getResetReason();
+    #else
+    doc[F("REBOOTINFO")] = reset_reason_str;
     #endif
     doc[F("REBOOTTIME")] = reboot_time_t;
     doc[F("RESTORE")] = _restore_states_on_start;
     doc[F("MODEL")] = cio->getModel();
-    doc[F("NOTIFY")] = _notify;
-    doc[F("NOTIFTIME")] = _notification_time;
-    doc[F("VTCAL")] = _vt_calibrated;
-
-    doc[F("LCK")] = dsp->EnabledButtons[LOCK];
-    doc[F("TMR")] = dsp->EnabledButtons[TIMER];
-    doc[F("AIR")] = dsp->EnabledButtons[BUBBLES];
-    doc[F("UNT")] = dsp->EnabledButtons[UNIT];
-    doc[F("HTR")] = dsp->EnabledButtons[HEAT];
-    doc[F("FLT")] = dsp->EnabledButtons[PUMP];
-    doc[F("DN")] = dsp->EnabledButtons[DOWN];
-    doc[F("UP")] = dsp->EnabledButtons[UP];
-    doc[F("PWR")] = dsp->EnabledButtons[POWER];
-    doc[F("HJT")] = dsp->EnabledButtons[HYDROJETS];
 
     // Serialize JSON to string
     if (serializeJson(doc, rtn) == 0) {
@@ -1255,25 +934,8 @@ void BWC::setJSONSettings(const String& message){
 
     // Copy existing values from the JsonDocument to the variables
     _price = doc[F("PRICE")] | _price;
-    _filter_replace_interval = doc[F("FREPI")] | _filter_replace_interval;
-    _filter_rinse_interval = doc[F("FRINI")] | _filter_rinse_interval;
-    _filter_clean_interval = doc[F("FCLEI")] | _filter_clean_interval;
-    _cl_interval = doc[F("CLINT")] | _cl_interval;
     _audio_enabled = doc[F("AUDIO")] | _audio_enabled;
     _restore_states_on_start = doc[F("RESTORE")] | _restore_states_on_start;
-    _notify = doc[F("NOTIFY")] | _notify;
-    _notification_time = doc[F("NOTIFTIME")] | _notification_time;
-    _vt_calibrated = doc[F("VTCAL")] | _vt_calibrated;
-    dsp->EnabledButtons[LOCK] = doc[F("LCK")] | dsp->EnabledButtons[LOCK];
-    dsp->EnabledButtons[TIMER] = doc[F("TMR")] | dsp->EnabledButtons[TIMER];
-    dsp->EnabledButtons[BUBBLES] = doc[F("AIR")] | dsp->EnabledButtons[BUBBLES];
-    dsp->EnabledButtons[UNIT] = doc[F("UNT")] | dsp->EnabledButtons[UNIT];
-    dsp->EnabledButtons[HEAT] = doc[F("HTR")] | dsp->EnabledButtons[HEAT];
-    dsp->EnabledButtons[PUMP] = doc[F("FLT")] | dsp->EnabledButtons[PUMP];
-    dsp->EnabledButtons[DOWN] = doc[F("DN")] | dsp->EnabledButtons[DOWN];
-    dsp->EnabledButtons[UP] = doc[F("UP")] | dsp->EnabledButtons[UP];
-    dsp->EnabledButtons[POWER] = doc[F("PWR")] | dsp->EnabledButtons[POWER];
-    dsp->EnabledButtons[HYDROJETS] = doc[F("HJT")] | dsp->EnabledButtons[HYDROJETS];
     saveSettings();
     BWC_YIELD;
 }
@@ -1296,7 +958,6 @@ void BWC::_updateSpaLinkHealth()
         _cioLink.lastChangeMs = now;
         if(!_cioLink.everOk) bwcLog(LOGLVL_INFO, "CIO", "link established (first valid packet)");
         _cioLink.everOk = true;
-        bwcLog(LOGLVL_DEBUG, "CIO", "packet good=%lu bad=%lu", (unsigned long)cio->good_packets_count, (unsigned long)cio->bad_packets_count);
     }
     if(dsp != nullptr && dsp->good_packets_count != _dspLink.prevGoodPackets)
     {
@@ -1304,7 +965,6 @@ void BWC::_updateSpaLinkHealth()
         _dspLink.lastChangeMs = now;
         if(!_dspLink.everOk) bwcLog(LOGLVL_INFO, "DSP", "link established (first valid packet)");
         _dspLink.everOk = true;
-        bwcLog(LOGLVL_DEBUG, "DSP", "packet good=%lu bad=%lu", (unsigned long)dsp->good_packets_count, (unsigned long)dsp->bad_packets_count);
     }
 }
 
@@ -1334,7 +994,6 @@ void BWC::_updateTimes(){
     // {
     //     cio->setStateAge(i, cio->getStateAge(i) + elapsedtime_ms);
     // }
-    _virtual_temp_fix_age += elapsedtime_ms;
 
     // Auto midnight reset (UTC day change)
     if (_timestamp_secs > 86400) {
@@ -1462,11 +1121,6 @@ bool BWC::_loadHardware(Models& cioNo, Models& dspNo, int pins[], std::optional<
     cioNo = doc[F("cio")];
     dspNo = doc[F("dsp")];
 
-    if(doc[F("hasTempSensor")].as<int>() == 1)
-    {
-        hasTempSensor = true;
-    }
-
     String pcbname = doc[F("pcb")].as<String>();
     // int pins[7];
     #ifdef ESP8266
@@ -1519,10 +1173,6 @@ void BWC::_loadSettings(){
     }
 
     // Copy values from the JsonDocument to the variables
-    _cl_timestamp_s = doc[F("CLTIME")];
-    _filter_replace_timestamp_s = doc[F("FREP")];
-    _filter_rinse_timestamp_s = doc[F("FRIN")];
-    _filter_clean_timestamp_s = doc[F("FCLE")];
     _uptime = doc[F("UPTIME")];
     _pumptime = doc[F("PUMPTIME")];
     _heatingtime = doc[F("HEATINGTIME")];
@@ -1534,13 +1184,7 @@ void BWC::_loadSettings(){
     _jettime_daily_ms = (uint32_t)(doc[F("JETTIMED")] | 0) * 1000;
     _uptime_daily_ms = (uint32_t)(doc[F("UPTIMED")] | 0) * 1000;
     _price = doc[F("PRICE")];
-    _filter_replace_interval = doc[F("FREPI")] | _filter_replace_interval;
-    _filter_rinse_interval = doc[F("FRINI")] | _filter_rinse_interval;
-    _filter_clean_interval = doc[F("FCLEI")] | _filter_clean_interval;
-    _cl_interval = doc[F("CLINT")];
     _audio_enabled = doc[F("AUDIO")];
-    _notify = doc[F("NOTIFY")];
-    _notification_time = doc[F("NOTIFTIME")];
     _energy_total_Ws = doc[F("KWH")];
     _energy_total_Ws *= 3600000; //kWh->Ws
     _energy_daily_Ws = doc[F("KWHD")]; 
@@ -1549,21 +1193,7 @@ void BWC::_loadSettings(){
     _energy_cost_daily = doc[F("COSTD")];
     _last_reset_day = doc[F("LRDAY")] | (uint32_t)0;
     _restore_states_on_start = doc[F("RESTORE")];
-    _R_COOLING = doc[F("R")] | 40.0f; //else use default
-    _ambient_temp = doc[F("AMB")] | 20;
     _dsp_brightness = doc[F("BRT")] | 7;
-    _vt_calibrated = doc[F("VTCAL")] | false;
-
-    dsp->EnabledButtons[LOCK] = doc[F("LCK")];
-    dsp->EnabledButtons[TIMER] = doc[F("TMR")];
-    dsp->EnabledButtons[BUBBLES] = doc[F("AIR")];
-    dsp->EnabledButtons[UNIT] = doc[F("UNT")];
-    dsp->EnabledButtons[HEAT] = doc[F("HTR")];
-    dsp->EnabledButtons[PUMP] = doc[F("FLT")];
-    dsp->EnabledButtons[DOWN] = doc[F("DN")];
-    dsp->EnabledButtons[UP] = doc[F("UP")];
-    dsp->EnabledButtons[POWER] = doc[F("PWR")];
-    dsp->EnabledButtons[HYDROJETS] = doc[F("HJT")];
 
     file.close();
     BWC_YIELD;
@@ -1684,6 +1314,8 @@ void BWC::saveRebootInfo(){
     // Set the values in the document
     #ifdef ESP8266
     doc[F("BOOTINFO")] = ESP.getResetReason() + " " + reboot_time_str;
+    #else
+    doc[F("BOOTINFO")] = reset_reason_str + " " + reboot_time_str;
     #endif
 
     // Serialize JSON to file
@@ -1788,10 +1420,6 @@ void BWC::saveSettings(){
     _jettime_ms = 0;
     _uptime_ms = 0;
     // Set the values in the document
-    doc[F("CLTIME")] = _cl_timestamp_s;
-    doc[F("FREP")] = _filter_replace_timestamp_s;
-    doc[F("FRIN")] = _filter_rinse_timestamp_s;
-    doc[F("FCLE")] = _filter_clean_timestamp_s;
     doc[F("UPTIME")] = _uptime;
     doc[F("PUMPTIME")] = _pumptime;
     doc[F("HEATINGTIME")] = _heatingtime;
@@ -1803,10 +1431,6 @@ void BWC::saveSettings(){
     doc[F("UPTIMED")] = _uptime_daily_ms / 1000;
     doc[F("JETTIME")] = _jettime;
     doc[F("PRICE")] = _price;
-    doc[F("FREPI")] = _filter_replace_interval;
-    doc[F("FRINI")] = _filter_rinse_interval;
-    doc[F("FCLEI")] = _filter_clean_interval;
-    doc[F("CLINT")] = _cl_interval;
     doc[F("AUDIO")] = _audio_enabled;
     doc[F("KWH")] = _energy_total_Ws / 3600000;  //Ws->kWh
     doc[F("KWHD")] = _energy_daily_Ws / 3600000; //Ws->kWh
@@ -1815,22 +1439,7 @@ void BWC::saveSettings(){
     doc[F("LRDAY")] = _last_reset_day;
     // doc[F("SAVETIME")] = DateTime.format(DateFormatter::SIMPLE);
     doc[F("RESTORE")] = _restore_states_on_start;
-    doc[F("R")] = _R_COOLING;
-    doc[F("AMB")] = _ambient_temp;
     doc[F("BRT")] = _dsp_brightness;
-    doc[F("NOTIFY")] = _notify;
-    doc[F("NOTIFTIME")] = _notification_time;
-    doc[F("VTCAL")] = _vt_calibrated;
-    doc[F("LCK")] = dsp->EnabledButtons[LOCK];
-    doc[F("TMR")] = dsp->EnabledButtons[TIMER];
-    doc[F("AIR")] = dsp->EnabledButtons[BUBBLES];
-    doc[F("UNT")] = dsp->EnabledButtons[UNIT];
-    doc[F("HTR")] = dsp->EnabledButtons[HEAT];
-    doc[F("FLT")] = dsp->EnabledButtons[PUMP];
-    doc[F("DN")] = dsp->EnabledButtons[DOWN];
-    doc[F("UP")] = dsp->EnabledButtons[UP];
-    doc[F("PWR")] = dsp->EnabledButtons[POWER];
-    doc[F("HJT")] = dsp->EnabledButtons[HYDROJETS];
 
     // Serialize JSON to file
     if (serializeJson(doc, file) == 0) {

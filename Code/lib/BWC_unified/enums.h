@@ -56,33 +56,28 @@ const uint8_t CHARS[] = {
     'h', 'H', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'x', 'y', 'z'
 };
 
+/* Explicit values kept stable: js/index.js (cmdMap) and lib/smarthomes/ha.hpp
+   hardcode these numbers in MQTT/websocket payloads. Removed commands leave
+   gaps rather than shifting the remaining ones. */
 enum Commands: byte
 {
-    SETTARGET,
-    SETUNIT,
-    SETBUBBLES,
-    SETHEATER,
-    SETPUMP,
-    RESETQ,
-    REBOOTESP,
-    GETTARGET,
-    RESETTIMES,
-    RESETCLTIMER,
-    RESETFREPLACETIMER,
-    SETJETS,
-    SETBRIGHTNESS,
-    SETBEEP,
-    SETAMBIENTF,
-    SETAMBIENTC,
-    RESETDAILY,
-    SETGODMODE,
-    SETFULLPOWER,
-    PRINTTEXT,
-    SETREADY,
-    SETR,
-    RESETFRINSETIMER,
-    RESETFCLEANTIMER,
-    SETPOWER
+    SETTARGET = 0,
+    SETUNIT = 1,
+    SETBUBBLES = 2,
+    SETHEATER = 3,
+    SETPUMP = 4,
+    RESETQ = 5,
+    REBOOTESP = 6,
+    GETTARGET = 7,
+    RESETTIMES = 8,
+    SETJETS = 11,
+    SETBRIGHTNESS = 12,
+    SETBEEP = 13,
+    RESETDAILY = 16,
+    SETGODMODE = 17,
+    SETFULLPOWER = 18,
+    PRINTTEXT = 19,
+    SETPOWER = 24
 };
 
 enum ToggleButtons: byte

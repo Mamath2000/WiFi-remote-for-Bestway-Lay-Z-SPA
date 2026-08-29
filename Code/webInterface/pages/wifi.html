@@ -9,19 +9,19 @@
 {% endblock %}
 
 {% block content %}
-<!-- ==================== SECTION: Access Point ==================== -->
+<!-- ==================== SECTION: WiFi Network ==================== -->
 <section>
-  <h2 data-i18n="section_ap">Access Point:</h2>
+  <h2 data-i18n="section_ap">WiFi Network:</h2>
   <table>
     <tr>
       <td>
-        <label for="enableAp" data-i18n="label_enableAp">Enable specific AP:</label>
+        <label for="enableAp" data-i18n="label_enableAp">Connect using specific WiFi credentials:</label>
         <span class="tooltip"
-          data-text="Checked: ESP will connect using these credentials. Unchecked: ESP will use last known credentials."
+          data-text="Checked: the ESP connects using the SSID and password below. Unchecked: the ESP reuses the last WiFi credentials saved on the module."
           data-i18n="[data-text]tooltip_enableAp">?</span>
       </td>
       <td>
-        <input type="checkbox" id="enableAp">
+        <input type="checkbox" id="enableAp" onclick="onEnableApClick()">
       </td>
     </tr>
     <tr>
@@ -44,17 +44,17 @@
 </section>
 
 
-<!-- ==================== SECTION: Soft Access Point ==================== -->
+<!-- ==================== SECTION: Emergency access point (SoftAP) ==================== -->
 <section>
-  <h2 data-i18n="section_softap">Soft Access Point:</h2>
+  <h2 data-i18n="section_softap">Emergency access point (SoftAP):</h2>
   <table>
     <tr>
       <td>
         <label for="enableWM" data-i18n="label_enableWM">
-          Enable Soft AP (I don’t see a reason to uncheck this! You can lock yourself out!):
+          Enable the emergency access point (recommended - leave this checked, you could lock yourself out otherwise):
         </label>
         <span class="tooltip"
-          data-text="Enable ESP access point to be able to open this page before your network credentials are set. You’d want this on normally! If your network is unavailable, the ESP will fire up its own AP."
+          data-text="If the ESP can't connect to the WiFi network above, it starts its own emergency access point (SoftAP) so you can reconfigure it. This access point is only active when the connection fails, not during normal operation."
           data-i18n="[data-text]tooltip_enableWM">?</span>
       </td>
       <td>

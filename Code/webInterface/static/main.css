@@ -655,3 +655,34 @@
     .darkmode footer {
       background: rgba(255,255,255,0.05);
     }
+
+    /* Live log viewer (debug.html) */
+    .logbox {
+      height: 320px;
+      overflow-y: auto;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+      padding: 8px;
+      border-radius: 4px;
+      margin-bottom: var(--section-padding);
+    }
+
+    .logline {
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.4;
+    }
+
+    .logline.log-error {
+      color: #f28b82;
+    }
+
+    .logline.log-info {
+      color: #d4d4d4;
+    }
+
+    .logline.log-debug {
+      color: #8a8a8a;
+    }

@@ -10,13 +10,6 @@
 char *stack_start;
 uint32_t heap_water_mark;
 
-// Setup a oneWire instance to communicate with any OneWire devices
-// Setting arbitrarily to 231 since this isn't an actual pin
-// Later during "setup" the correct pin will be set, if enabled 
-OneWire *oneWire;
-// Pass our oneWire reference to Dallas Temperature sensor 
-DallasTemperature *tempSensors;
-
 #ifdef ESP8266
 WiFiEventHandler gotIpEventHandler, disconnectedEventHandler;
 void cb_gotIP(const WiFiEventStationModeGotIP& event)
@@ -200,8 +193,7 @@ void setup()
         HeapSelectIram ephemeral;
         #endif
         bwc = new BWC;
-        oneWire = new OneWire(231);
-        tempSensors = new DallasTemperature(oneWire);
+        bwc->reset_reason_str = reset_reason_str; // surfaced in /getconfig/'s REBOOTINFO
         // bootlogTimer = new Ticker;
         periodicTimer = new Ticker;
         startComplete_ticker = new Ticker;
@@ -220,7 +212,7 @@ void setup()
         mqtt_info->useMqtt = MQTT_USEMQTT;
         wifi_info = new sWifi_info{.enableWmApFallback = true};
     }
-    setLogSink(mqttLogSink);
+    setLogSink(logSink);
     bwc->setup();
     bwc->loop();
     periodicTimer->attach(periodicTimerInterval, []{ periodicTimerFlag = true; });
@@ -228,7 +220,6 @@ void setup()
     startComplete_ticker->attach(30, []{ bwc->restoreStates(); startComplete_ticker->detach(); delete startComplete_ticker; }); //can it destroy itself?
     // update webpage every WS_PERIOD seconds. (will also be updated on state changes)
     updateWSTimer->attach(WS_PERIOD, []{ sendWSFlag = true; });
-    loadWebConfig();
     startWiFi();
     if(wifi_info->enableWmApFallback) startSoftAp(); // not blocking anymore so no use case should exist for this to be turned off.
     bootStage = BOOT_WIFI;
@@ -237,14 +228,6 @@ void setup()
     startWebSocket();
     startOTA();
     startMqtt();
-    if(bwc->hasTempSensor)
-    {
-        #ifdef ESP8266
-        HeapSelectIram ephemeral;
-        #endif
-        oneWire->begin(bwc->tempSensorPin);
-        tempSensors->begin();
-    }
     bwc->print("---");  //No overloaded function exists for the F() macro
     bwc->print(FW_VERSION);
     BWC_LOG_P(PSTR("End of setup() @ Millis: %d @ line: %d. Heap: %d\n"), millis(), __LINE__, ESP.getFreeHeap());
@@ -339,8 +322,6 @@ void loop()
                 BWC_LOG_P(PSTR("MQTT > Not connected\n"),0);
                 mqttConnect();
             }
-            // Leverage the pre-existing periodicTimerFlag to also set temperature, if enabled
-            setTemperatureFromSensor();
         }
     }
 
@@ -720,10 +701,6 @@ void stopall()
     if(ntpCheck_ticker->active()) ntpCheck_ticker->detach();
     // if(checkWifi_ticker->active()) checkWifi_ticker->detach();
     //bwc->saveSettings();
-    delete tempSensors;
-    tempSensors = nullptr;
-    delete oneWire;
-    oneWire = nullptr;
     BWC_LOG_P(PSTR("MQTT > stopping\n"),0);
     if(mqtt_info->useMqtt) mqttClient->disconnect();
     if(aWifiClient) delete aWifiClient;
@@ -875,8 +852,6 @@ void startHttpServer()
         server->on(F("/addcommand/"), handleAddCommand);
         server->on(F("/editcommand/"), handleEditCommand);
         server->on(F("/delcommand/"), handleDelCommand);
-        server->on(F("/getwebconfig/"), handleGetWebConfig);
-        server->on(F("/setwebconfig/"), handleSetWebConfig);
         server->on(F("/getwifi/"), handleGetWifi);
         server->on(F("/setwifi/"), handleSetWifi);
         server->on(F("/resetwifi/"), handleResetWifi);
@@ -888,7 +863,6 @@ void startHttpServer()
         server->on(F("/upload.html"), HTTP_POST, [](){
             server->send(200, F("text/plain"), "");
         }, handleFileUpload);
-        server->on(F("/remove.html"), HTTP_POST, handleFileRemove);
         server->on(F("/remove/"), HTTP_GET, handleFileRemove);
         server->on(F("/restart/"), handleRestart);
         server->on(F("/metrics"), handlePrometheusMetrics);  //prometheus metrics
@@ -897,6 +871,8 @@ void startHttpServer()
         server->on(F("/gethardware/"), handleGetHardware);
         server->on(F("/debug-on/"), [](){bwc->BWC_DEBUG = true; server->send(200, F("text/plain"), "ok");});
         server->on(F("/debug-off/"), [](){bwc->BWC_DEBUG = false; server->send(200, F("text/plain"), "ok");});
+        server->on(F("/getdebug/"), handleGetDebugConfig);
+        server->on(F("/setdebug/"), handleSetDebugConfig);
         server->on(F("/cmdq_file/"), handle_cmdq_file);
 
         // if someone requests any other file or page, go to function 'handleNotFound'
@@ -1251,6 +1227,53 @@ void handleSetConfig()
 }
 
 /**
+ * response for /getdebug/
+ * web server prints a json document
+ */
+void handleGetDebugConfig()
+{
+    if (!checkHttpPost(server->method())) return;
+
+    StaticJsonDocument<64> doc;
+    doc[F("mqttDebug")] = mqtt_debug_enabled;
+    doc[F("webDebug")] = web_debug_enabled;
+    String json;
+    serializeJson(doc, json);
+    server->send(200, F("application/json"), json);
+}
+
+/**
+ * response for /setdebug/
+ * web server writes a json document
+ */
+void handleSetDebugConfig()
+{
+    if (!checkHttpPost(server->method())) return;
+
+    StaticJsonDocument<64> doc;
+    String message = server->arg(0);
+    DeserializationError error = deserializeJson(doc, message);
+    if (error)
+    {
+        server->send(400, F("text/plain"), F("Error deserializing message"));
+        return;
+    }
+
+    mqtt_debug_enabled = doc[F("mqttDebug")];
+    web_debug_enabled = doc[F("webDebug")];
+    bwcLog(LOGLVL_INFO, "LOG", "debug logging: mqtt=%s web=%s", mqtt_debug_enabled ? "on" : "off", web_debug_enabled ? "on" : "off");
+
+    // Re-publish (retained) so the HA switch's state_topic reflects the change
+    // immediately, instead of waiting for the next reconnect (see mqttCallback()).
+    if (mqttClient != nullptr && mqttClient->connected())
+    {
+        mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/log_level")).c_str(), mqtt_debug_enabled ? "debug" : "info", true);
+    }
+
+    server->send(200, F("text/plain"), "");
+}
+
+/**
  * response for /getcommands/
  * web server prints a json document
  */
@@ -1412,130 +1435,6 @@ void copyFile(String source, String dest)
     f_dest.close(); // done, close the destination file
     f_source.close(); // done, close the source file
     BWC_YIELD;
-}
-
-/**
- * load "Web Config" json configuration from "webconfig.json"
- */
-void loadWebConfig()
-{
-    // DynamicJsonDocument doc(1024);
-    StaticJsonDocument<256> doc;
-
-    File file = LittleFS.open(F("/webconfig.json"), "r");
-    if (file)
-    {
-        DeserializationError error = deserializeJson(doc, file);
-        if (error)
-        {
-        // Serial.println(F("Failed to deserialize webconfig.json"));
-        file.close();
-        return;
-        }
-    }
-    else
-    {
-        // Serial.println(F("Failed to read webconfig.json. Using defaults."));
-    }
-
-    showSectionTemperature = (doc.containsKey(F("SST")) ? doc[F("SST")] : true);
-    showSectionDisplay = (doc.containsKey(F("SSD")) ? doc[F("SSD")] : true);
-    showSectionControl = (doc.containsKey(F("SSC")) ? doc[F("SSC")] : true);
-    showSectionButtons = (doc.containsKey(F("SSB")) ? doc[F("SSB")] : true);
-    showSectionTimer = (doc.containsKey(F("SSTIM")) ? doc[F("SSTIM")] : true);
-    showSectionTotals = (doc.containsKey(F("SSTOT")) ? doc[F("SSTOT")] : true);
-    useControlSelector = (doc.containsKey(F("UCS")) ? doc[F("UCS")] : false);
-    BWC_YIELD;
-}
-
-/**
- * save "Web Config" json configuration to "webconfig.json"
- */
-void saveWebConfig()
-{
-    File file = LittleFS.open(F("/webconfig.json"), "w");
-    if (!file)
-    {
-        // Serial.println(F("Failed to save webconfig.json"));
-        return;
-    }
-
-    // DynamicJsonDocument doc(256);
-    StaticJsonDocument<256> doc;
-
-    doc[F("SST")] = showSectionTemperature;
-    doc[F("SSD")] = showSectionDisplay;
-    doc[F("SSC")] = showSectionControl;
-    doc[F("SSB")] = showSectionButtons;
-    doc[F("SSTIM")] = showSectionTimer;
-    doc[F("SSTOT")] = showSectionTotals;
-    doc[F("UCS")] = useControlSelector;
-
-    if (serializeJson(doc, file) == 0)
-    {
-        // Serial.println(F("{\"error\": \"Failed to serialize file\"}"));
-    }
-    file.close();
-    BWC_YIELD;
-}
-
-/**
- * response for /getwebconfig/
- * web server prints a json document
- */
-void handleGetWebConfig()
-{
-    if (!checkHttpPost(server->method())) return;
-
-    // DynamicJsonDocument doc(256);
-    StaticJsonDocument<256> doc;
-
-    doc[F("SST")] = showSectionTemperature;
-    doc[F("SSD")] = showSectionDisplay;
-    doc[F("SSC")] = showSectionControl;
-    doc[F("SSB")] = showSectionButtons;
-    doc[F("SSTIM")] = showSectionTimer;
-    doc[F("SSTOT")] = showSectionTotals;
-    doc[F("UCS")] = useControlSelector;
-
-    String json;
-    if (serializeJson(doc, json) == 0)
-    {
-        json = F("{\"error\": \"Failed to serialize webcfg\"}");
-    }
-    server->send(200, F("application/json"), json);
-}
-
-/**
- * response for /setwebconfig/
- * web server writes a json document
- */
-void handleSetWebConfig()
-{
-    if (!checkHttpPost(server->method())) return;
-
-    // DynamicJsonDocument doc(256);
-    StaticJsonDocument<256> doc;
-    String message = server->arg(0);
-    DeserializationError error = deserializeJson(doc, message);
-    if (error)
-    {
-        // Serial.println(F("Failed to read config file"));
-        server->send(400, F("text/plain"), F("Error deserializing message"));
-        return;
-    }
-
-    showSectionTemperature = doc[F("SST")];
-    showSectionDisplay = doc[F("SSD")];
-    showSectionControl = doc[F("SSC")];
-    showSectionButtons = doc[F("SSB")];
-    showSectionTimer = doc[F("SSTIM")];
-    showSectionTotals = doc[F("SSTOT")];
-    useControlSelector = doc[F("UCS")];
-
-    saveWebConfig();
-
-    server->send(200, F("text/plain"), "");
 }
 
 /**
@@ -2098,23 +1997,43 @@ void startMqtt()
 }
 
 /**
- * bwcLog() sink: forwards to "<base>/log" as JSON once MQTT is connected.
- * info/error always go out; debug only while mqtt_debug_enabled is set
- * (toggled via the "<base>/log_level" topic - see mqttCallback()).
+ * bwcLog() sink: forwards to MQTT ("<base>/log") and/or to any browser with
+ * debug.html open (over the WebSocket, CONTENT "LOG"). info/error always go
+ * out on an enabled transport; debug lines are opt-in per transport
+ * (mqtt_debug_enabled / web_debug_enabled - see handleSetDebugConfig() and
+ * mqttCallback()'s "<base>/log_level" handling).
  */
-void mqttLogSink(const char* tag, LogLevel lvl, const char* msg)
+void logSink(const char* tag, LogLevel lvl, const char* msg)
 {
-    if(lvl == LOGLVL_DEBUG && !mqtt_debug_enabled) return;
-    if(mqttClient == nullptr || !mqttClient->connected()) return;
-    StaticJsonDocument<256> doc;
-    doc[F("ts")] = millis();
-    doc[F("tag")] = tag;
-    doc[F("lvl")] = lvl == LOGLVL_ERROR ? "error" : (lvl == LOGLVL_DEBUG ? "debug" : "info");
-    doc[F("msg")] = msg;
-    String json;
-    json.reserve(160);
-    serializeJson(doc, json);
-    mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/log")).c_str(), json.c_str(), false);
+    bool isDebugLine = (lvl == LOGLVL_DEBUG);
+    const char* lvlStr = lvl == LOGLVL_ERROR ? "error" : (lvl == LOGLVL_DEBUG ? "debug" : "info");
+
+    if (!(isDebugLine && !mqtt_debug_enabled) && mqttClient != nullptr && mqttClient->connected())
+    {
+        StaticJsonDocument<256> doc;
+        doc[F("ts")] = millis();
+        doc[F("tag")] = tag;
+        doc[F("lvl")] = lvlStr;
+        doc[F("msg")] = msg;
+        String json;
+        json.reserve(160);
+        serializeJson(doc, json);
+        mqttClient->publish((String(mqtt_info->mqttBaseTopic) + F("/log")).c_str(), json.c_str(), false);
+    }
+
+    if (!(isDebugLine && !web_debug_enabled) && webSocket != nullptr && webSocket->connectedClients() > 0)
+    {
+        StaticJsonDocument<256> doc;
+        doc[F("CONTENT")] = F("LOG");
+        doc[F("ts")] = millis();
+        doc[F("tag")] = tag;
+        doc[F("lvl")] = lvlStr;
+        doc[F("msg")] = msg;
+        String json;
+        json.reserve(192);
+        serializeJson(doc, json);
+        webSocket->broadcastTXT(json);
+    }
 }
 
 /**
@@ -2379,27 +2298,6 @@ void handleESPInfo()
     server->sendContent("");
 
     #endif
-}
-
-void setTemperatureFromSensor()
-{
-    if(bwc->hasTempSensor)
-    { 
-            tempSensors->requestTemperatures(); 
-            float temperatureC = tempSensors->getTempCByIndex(0);
-            //float temperatureF = tempSensors.getTempFByIndex(0);
-            //Serial.print(temperatureC);
-            //Serial.println("ºC");
-            //Serial.print(temperatureF);
-            //Serial.println("ºF");
-
-            // Ignore bad reads
-            if(temperatureC >= -20.0)
-            {
-                bwc->setAmbientTemperature(temperatureC, true);
-            }
-    }
-    BWC_YIELD;
 }
 
 #ifdef ESP8266

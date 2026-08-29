@@ -13,24 +13,14 @@ const cmdMap = {
     restartEsp: 6,
     //gettarget: 7,
     resetTotals: 8,
-    resetTimerChlorine: 9,
-    resetTimerReplaceFilter: 10,
     toggleHydroJets: 11,
     setBrightness: 12,
     setBrightnessSelector: 12,
     setBeep: 13,
-    setAmbient: 15,
-    setAmbientSelector: 15,
-    setAmbientF: 14,
-    setAmbientC: 15,
     resetDaily: 16,
     toggleGodmode: 17,
     setFullpower: 18,
-    printText: 19,
-    setReady: 20,
-    setR: 21,
-    resetTimerRinseFilter: 22,
-    resetTimerCleanFilter: 23
+    printText: 19
 }
 
 // button element ID mapping
@@ -51,52 +41,10 @@ const dspBrtMultiplier = 16
 
 // update states
 updateTempState = false
-updateAmbState = false
 updateBrtState = false
 
 // initial connect to the web socket
 connect()
-loadWebConfig();
-
-if (localStorage.getItem('showSectionTemperature'))
-{
-	setWebConfig();
-}
-
-function setWebConfig()
-{
-	document.getElementById('sectionTemperature').style.display = (localStorage.getItem('showSectionTemperature') !== 'false' ? 'block' : 'none');
-	document.getElementById('sectionDisplay').style.display = (localStorage.getItem('showSectionDisplay') !== 'false' ? 'block' : 'none');
-	document.getElementById('sectionControl').style.display = (localStorage.getItem('showSectionControl') !== 'false' ? 'block' : 'none');
-	document.getElementById('sectionButtons').style.display = (localStorage.getItem('showSectionButtons') !== 'false' ? 'block' : 'none');
-	document.getElementById('sectionTimer').style.display = (localStorage.getItem('showSectionTimer') !== 'false' ? 'block' : 'none');
-	document.getElementById('sectionTotals').style.display = (localStorage.getItem('showSectionTotals') !== 'false' ? 'block' : 'none');
-	document.getElementById('tableSlider').style.display = (localStorage.getItem('useControlSelector') !== 'false' ? 'none' : 'table');
-	document.getElementById('tableSelector').style.display = (localStorage.getItem('useControlSelector') !== 'false' ? 'table' : 'none');
-}
-
-function loadWebConfig()
-{
-	const Http = new XMLHttpRequest();
-	const url = '/getwebconfig/';
-	Http.open('POST', url);
-	Http.send();
-	Http.onreadystatechange = function()
-	{
-		if (this.readyState == 4 && this.status == 200)
-		{
-			var json = JSON.parse(Http.responseText);
-			localStorage.setItem('showSectionTemperature', json.SST);
-			localStorage.setItem('showSectionDisplay', json.SSD);
-			localStorage.setItem('showSectionControl', json.SSC);
-			localStorage.setItem('showSectionButtons', json.SSB);
-			localStorage.setItem('showSectionTimer', json.SSTIM);
-			localStorage.setItem('showSectionTotals', json.SSTOT);
-			localStorage.setItem('useControlSelector', json.UCS);
-			setWebConfig();
-		}
-	}
-}
 
 function resetTotals()
 {
@@ -189,7 +137,6 @@ function handlemsg(e) {
         // hydro jets available
         document.getElementById("jets").style.display = msgobj.HASJETS ? "table-cell" : "none"
         document.getElementById("jetsswitch").style.display = msgobj.HASJETS ? "table-cell" : "none"
-        document.getElementById("jetstotals").style.display = msgobj.HASJETS ? "table-cell" : "none"
         // godmode available
         document.getElementById("god").style.display = msgobj.HASGOD ? "table-cell" : "none"
         document.getElementById("godswitch").style.display = msgobj.HASGOD ? "table-cell" : "none"
@@ -198,7 +145,6 @@ function handlemsg(e) {
     if (msgobj.CONTENT == "STATES") {
         // temperature
         document.getElementById("atlabel").innerHTML = msgobj.TMP.toString()
-        document.getElementById("vtlabel").innerHTML = msgobj.VTM.toFixed(2).toString()
         document.getElementById("ttlabel").innerHTML = msgobj.TGT.toString()
 
         // buttons
@@ -227,31 +173,22 @@ function handlemsg(e) {
         if (initControlValues) {
             var minTemp = msgobj.UNT ? 20 : 68
             var maxTemp = msgobj.UNT ? 40 : 104
-            var minAmb = msgobj.UNT ? -40 : -40
-            var maxAmb = msgobj.UNT ? 60 : 140
             document.getElementById("temp").min = minTemp
             document.getElementById("temp").max = maxTemp
             document.getElementById("selectorTemp").min = minTemp
             document.getElementById("selectorTemp").max = maxTemp
-            document.getElementById("amb").min = minAmb
-            document.getElementById("amb").max = maxAmb
-            document.getElementById("selectorAmb").min = minAmb
-            document.getElementById("selectorAmb").max = maxAmb
 
             document.getElementById("temp").value = msgobj.TGT
-            document.getElementById("amb").value = msgobj.AMB
             document.getElementById("brt").value = msgobj.BRT
 
             initControlValues = false
         }
 
         document.getElementById("sliderTempVal").innerHTML = msgobj.TGT
-        document.getElementById("sliderAmbVal").innerHTML = msgobj.AMB
         document.getElementById("sliderBrtVal").innerHTML = msgobj.BRT
 
         // get selector elements
         var elemSelectorTemp = document.getElementById("selectorTemp")
-        var elemSelectorAmb = document.getElementById("selectorAmb")
         var elemSelectorBrt = document.getElementById("selectorBrt")
 
         // change values only if element is not active (selected for input)
@@ -260,15 +197,10 @@ function handlemsg(e) {
             elemSelectorTemp.value = msgobj.TGT
             elemSelectorTemp.parentElement.querySelector(".numDisplay").textContent = msgobj.TGT
         }
-        if (document.activeElement !== elemSelectorAmb && !updateAmbState) {
-            elemSelectorAmb.value = msgobj.AMB
-            elemSelectorAmb.parentElement.querySelector(".numDisplay").textContent = msgobj.AMB
-        }
         if (document.activeElement !== elemSelectorBrt && !updateBrtState) elemSelectorBrt.value = msgobj.BRT
 
         // reset update states when the set target matches the input
         if (elemSelectorTemp.value == msgobj.TGT) updateTempState = false
-        if (elemSelectorAmb.value == msgobj.AMB) updateAmbState = false
         if (elemSelectorBrt.value == msgobj.BRT) updateBrtState = false
     }
 
@@ -276,54 +208,8 @@ function handlemsg(e) {
         var date = new Date(msgobj.TIME * 1000)
         document.getElementById("time").innerHTML = date.toLocaleString()
 
-        // chlorine add reset timer
-        var clDate = (Date.now() / 1000 - msgobj.CLTIME) / (24 * 3600.0)
-        var clDateRound = Math.round(clDate)
-        document.getElementById("cltimer").innerHTML = clDateRound + " day" + (clDateRound != 1 ? "s" : "")
-        document.getElementById("cltimerbtn").className = clDate > msgobj.CLINT ? "button_red" : "button"
-
-        // filter change reset timer
-        var fDate = (Date.now() / 1000 - msgobj.FREP) / (24 * 3600.0)
-        var fDateRound = Math.round(fDate)
-        document.getElementById("freplacetimer").innerHTML = fDateRound + " day" + (fDateRound != 1 ? "s" : "")
-        document.getElementById("freplacetimerbtn").className = fDate > msgobj.FREPI ? "button_red" : "button"
-
-        // filter clean reset timer
-        var fDate = (Date.now() / 1000 - msgobj.FCLE) / (24 * 3600.0)
-        var fDateRound = Math.round(fDate)
-        document.getElementById("fcleantimer").innerHTML = fDateRound + " day" + (fDateRound != 1 ? "s" : "")
-        document.getElementById("fcleantimerbtn").className = fDate > msgobj.FCLEI ? "button_red" : "button"
-
-        // filter rinse reset timer
-        var fDate = (Date.now() / 1000 - msgobj.FRIN) / (24 * 3600.0)
-        var fDateRound = Math.round(fDate)
-        document.getElementById("frinsetimer").innerHTML = fDateRound + " day" + (fDateRound != 1 ? "s" : "")
-        document.getElementById("frinsetimerbtn").className = fDate > msgobj.FRINI ? "button_red" : "button"
-
-        // statistics
-        document.getElementById("heatingtime").innerHTML = s2dhms(msgobj.HEATINGTIME)
-        document.getElementById("uptime").innerHTML = s2dhms(msgobj.UPTIME)
-        document.getElementById("airtime").innerHTML = s2dhms(msgobj.AIRTIME)
-        document.getElementById("filtertime").innerHTML = s2dhms(msgobj.PUMPTIME)
-        document.getElementById("jettime").innerHTML = s2dhms(msgobj.JETTIME)
         document.getElementById("cost").innerHTML = msgobj.COST.toFixed(2)
-        document.getElementById("t2r").innerHTML = s2dhms(msgobj.T2R * 3600) + " (" + msgobj.RS + ")"
     }
-}
-
-function s2dhms(val) {
-    var day = 3600 * 24
-    var hour = 3600
-    var minute = 60
-    var rem
-    var days = Math.floor(val / day)
-    rem = val % day
-    var hours = Math.floor(rem / hour)
-    rem = val % hour
-    var minutes = Math.floor(rem / minute)
-    rem = val % minute
-    var seconds = Math.floor(rem)
-    return days + "d " + hours.toString().pad("0", 2) + ":" + minutes.toString().pad("0", 2) + ":" + seconds.toString().pad("0", 2)
 }
 
 function sendCommand(cmd) {
@@ -347,13 +233,6 @@ function sendCommand(cmd) {
         document.getElementById("selectorTemp").value = value.toString()
         document.getElementById("selectorTemp").setAttribute("value", value.toString())
         updateTempState = true
-    } else if (cmd == "setAmbient" || cmd == "setAmbientSelector") {
-        value = parseInt(document.getElementById(cmd == "setAmbient" ? "amb" : "selectorAmb").value)
-        value = getProperValue(value, unit ? -40 : -40, unit ? 60 : 140)
-        document.getElementById("sliderAmbVal").innerHTML = value.toString()
-        document.getElementById("selectorAmb").value = value.toString()
-        cmd = "setAmbient" + (unit ? "C" : "F")
-        updateAmbState = true
     } else if (cmd == "setBrightness" || cmd == "setBrightnessSelector") {
         value = parseInt(document.getElementById(cmd == "setBrightness" ? "brt" : "selectorBrt").value)
         value = getProperValue(value, 0, 8)

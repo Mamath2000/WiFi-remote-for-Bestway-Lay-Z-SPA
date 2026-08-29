@@ -101,18 +101,6 @@ void DSP_6W::updateToggles()
     }
     _prev_btn = btn;
 
-    /* Filter enabled buttons */
-    dsp_toggles.locked_pressed &= EnabledButtons[LOCK];
-    dsp_toggles.timer_pressed &= EnabledButtons[TIMER];
-    dsp_toggles.bubbles_change &= EnabledButtons[BUBBLES];
-    dsp_toggles.unit_change &= EnabledButtons[UNIT];
-    dsp_toggles.heat_change &= EnabledButtons[HEAT];
-    dsp_toggles.pump_change &= EnabledButtons[PUMP];
-    dsp_toggles.down_pressed &= EnabledButtons[DOWN];
-    dsp_toggles.up_pressed &= EnabledButtons[UP];
-    dsp_toggles.power_change &= EnabledButtons[POWER];
-    dsp_toggles.jets_change &= EnabledButtons[HYDROJETS];
-    
     return;
 }
 

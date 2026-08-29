@@ -18,8 +18,6 @@
 
 #endif
 
-#include <OneWire.h>
-#include <DallasTemperature.h>
 #include <LittleFS.h>
 #include <PubSubClient.h> // ** Requires library 2.8.0 or higher ** https://github.com/knolleary/pubsubclient
 #include <Ticker.h>
@@ -52,8 +50,12 @@ bool send_mqtt_cfg_needed = false;
 bool gotIP_flag = false;
 bool disconnected_flag = false;
 // Debug-level bwcLog() lines are noisy (raw CIO/DSP traffic) - opt-in only,
-// toggled at runtime via the "<base>/log_level" MQTT topic ("debug"/"info").
+// toggled at runtime via the "<base>/log_level" MQTT topic ("debug"/"info")
+// or from the web UI's debug.html (see /getdebug/, /setdebug/).
 bool mqtt_debug_enabled = false;
+// Same idea, but gates whether debug-level lines get pushed to debug.html
+// over the WebSocket (see logSink() and wsLogSink()).
+bool web_debug_enabled = false;
 // Set once in setup() (ESP32 only, see esp_reset_reason()), published to
 // "<base>/reboot_reason" on the first MQTT connect - the ESP8266 branch
 // already had this via ESP.getResetReason(), ESP32 never did.
@@ -144,16 +146,14 @@ bool handleFileRead(String path);
 bool checkHttpPost(HTTPMethod method);
 void handleGetConfig();
 void handleSetConfig();
+void handleGetDebugConfig();
+void handleSetDebugConfig();
 void handleGetCommandQueue();
 void handleAddCommand();
 void handleEditCommand();
 void handleDelCommand();
 void handle_cmdq_file();
 void copyFile(String source, String dest);
-void loadWebConfig();
-void saveWebConfig();
-void handleGetWebConfig();
-void handleSetWebConfig();
 void loadWifi();
 void saveWifi();
 void handleGetWifi();
@@ -175,10 +175,9 @@ void updateError(int err);
 void startMqtt();
 void mqttCallback(char* topic, byte* payload, unsigned int length);
 void mqttConnect();
-void mqttLogSink(const char* tag, LogLevel lvl, const char* msg);
+void logSink(const char* tag, LogLevel lvl, const char* msg);
 time_t getBootTime();
 void handleESPInfo();
-void setTemperatureFromSensor();
 void setupHA();
 void handlePrometheusMetrics();
 

@@ -28,13 +28,6 @@ class DSP
         uint32_t bad_packets_count = 0;
         int write_msg_count = 0;
 
-        /*
-        Set to zero to disable chosen buttons.
-        Order: NOBTN,LOCK,TIMER,BUBBLES,UNIT,HEAT,PUMP,DOWN,UP,POWER,HYDROJETS
-        Example: to disable UNIT and TIMER set to 1,1,0,1,0,1,1,1,1,1,1
-        or use Buttons enum - "EnabledButtons[UNIT] = 0"
-        */
-        bool EnabledButtons[11] = {1,1,1,1,1,1,1,1,1,1,1};
         int max_time_between_transmissions_ms = -1;
 
     protected:

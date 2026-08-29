@@ -5,41 +5,27 @@ header_subtitle=Modulo Lay-Z-Spa
 titolo_home=Modulo Lay-Z-Spa
 header_by=di visualapproach
 
-titolo_calib=Modulo Lay-Z-Spa | Calibrazione manuale SPA
-titolo_calib_header=Calibrazione manuale SPA
 header_module=Modulo Lay-Z-Spa
 
 menu_home=Home
 menu_hwconfig=Configurazione Hardware
-menu_spaconfig=Configurazione SPA
-menu_webconfig=Configurazione Web
 menu_networkconfig=Configurazione Rete
 menu_mqttconfig=Configurazione MQTT
+menu_debug=Debug
 menu_directory=Directory
 menu_upload=Caricamento file
-menu_remove=Rimozione file
-menu_chkupdatefw=Verifica aggiornamento firmware
 menu_restart=Riavvia ESP
 
 button_save=Salva
 label_langue=Lingua :
 
-show_section_temp=Mostra sezione "Temperatura"
-show_section_display=Mostra sezione "Display"
-show_section_control=Mostra sezione "Controllo"
-show_section_buttons=Mostra sezione "Pulsanti"
-show_section_timer=Mostra sezione "Timer"
-show_section_totals=Mostra sezione "Totali"
-use_control_selector=Usa selettore (invece del cursore)
 
 section_temp_title=Temperatura
 label_actual=Reale :
-label_virtual=Virtuale :
 label_target=Obiettivo :
 
 section_control_title=Controllo
 control_temp=Temperatura
-control_ambient=Temperatura ambiente
 control_brightness=Luminosità
 
 section_buttons_title=Pulsanti
@@ -50,27 +36,16 @@ btn_unit=Unità (F/C)
 btn_hydrojets=Idrogetti
 btn_take_control=Prendi controllo
 
-section_timer_title=Timer
-tim_label_chlorine=Ultima aggiunta di cloro <span id="cltimer">n/a</span> fa.
-tim_label_filter_change=Ultimo cambio filtro <span id="freplacetimer">n/a</span> fa.
-tim_label_filter_clean=Ultima pulizia filtro <span id="fcleantimer">n/a</span> fa.
-tim_label_filter_rinse=Ultimo risciacquo filtro <span id="frinsetimer">n/a</span> fa.
 btn_reset=azzera
 
 section_totals_title=Totali
 totals_time_label=Tempo :
-totals_ready_label=Pronto tra :
 totals_uptime_label=Tempo di funzionamento :
 totals_pump_label=Pompa :
 totals_heating_label=Riscaldamento :
 totals_air_label=Aria :
 totals_hydrojets_label=Idrogetti :
 totals_cost_label=Costo stimato :
-
-label_start_temp=Temperatura iniziale :
-label_end_temp=Temperatura finale :
-label_avg_ambient=Temperatura ambiente media :
-label_time_minutes=tempo (minuti) :
 
 footer_mqtt_loading=MQTT : stato in caricamento…
 footer_spalink_loading=Collegamento spa : stato in caricamento…
@@ -80,82 +55,22 @@ footer_rssi_loading=RSSI : stato in caricamento…
 
 titolo_chkupdatefw=Modulo Lay-Z-Spa | Verifica aggiornamento firmware
 titolo_chkupdatefw_header=Verifica aggiornamento firmware
-chkupdate_message=Questa funzionalità è stata rimossa. Era troppo impegnativa per l'ESP8266 e non sono riuscito a far sì che GitHub inviasse pacchetti abbastanza piccoli da gestire. Peccato, perché funzionava prima, ma penso che qualcosa sia cambiato dal lato di GitHub.
 
-tooltip_virtual=L'ESP tenta di tracciare la temperatura dell'acqua anche quando la pompa è spenta e la temperatura scende nella pompa mentre il grande volume d'acqua si raffredda più lentamente. Usa la temperatura ambiente. Deve essere calibrato prima dell'uso. Vedi pagina Configurazione SPA.
 tooltip_brightness=Promemoria: Quando impostato su "0", il display e tutti i pulsanti della pompa sono completamente spenti, ma si accendono per 5 s quando si preme un pulsante.
 tooltip_time=L'ESP invia l'ora in UTC. Il browser converte nell'ora locale.
-tooltip_ready=Nuova modalità di stima del tempo di riscaldamento. Funziona meglio se viene fornita la temperatura ambiente reale (es: tramite Home Assistant).
 tooltip_uptime=Tempo totale di funzionamento dell'ESP dall'ultimo reset del contatore. Il riavvio continua il conteggio.
 
 titolo_spaconfig=Modulo Lay-Z-Spa | Configurazione SPA
 
 label_price_kwh=Prezzo per kWh :
-label_chlorine_interval=Aggiunta cloro (giorni) :
-label_filter_change_interval=Cambio filtro (giorni) :
-label_filter_clean_interval=Pulizia filtro (giorni) :
-label_filter_rinse_interval=Risciacquo filtro (giorni) :
 label_audio=Audio :
-label_notification=Notifica :
-label_notification_time=Tempo notifica (s) :
 label_restore_states=Ripristina stati all'avvio :
-label_calibrated=Calibrato :
-link_manual_cal=cal. manuale
 
-section_display_buttons=Pulsanti display abilitati.
-label_all=Tutti :
-btn_lock=Blocco
-btn_timer=Timer
-btn_air=Aria
 btn_unit=Unità
-btn_heat=Riscaldamento
 btn_pump=Pompa
-btn_down=Giù
-btn_up=Su
-btn_power=Accensione
-btn_jets=Getti
 
-label_command=Comando :
-option_set_target=Imposta temperatura obiettivo (20-40/68-104)
-option_set_unit=Imposta unità (0/1)
-option_set_bubbles=Imposta bolle d'aria (0/1)
-option_set_heat=Imposta riscaldamento (0/1)
-option_set_pump=Imposta pompa filtro (0/1)
-option_reset_queue=Azzera coda (-)
-option_reboot_esp=Riavvia ESP
-option_internal_cmd=Comando interno (ottieni obiettivo) (-)
-option_reset_times=Azzera tempi (-)
-option_reset_cl=Azzera timer cloro (-)
-option_reset_filter_change=Azzera timer cambio filtro (-)
-option_set_jets=Imposta idrogetti (0/1)
-option_set_brightness=Imposta luminosità display (0-8)
-option_beep=Imposta beep (0/1 o 2+testo=nomefile)
-option_set_ambient_f=Imposta temperatura ambiente F (intero)
-option_set_ambient_c=Imposta temperatura ambiente C (intero)
-option_reset_daily=Azzera contatore giornaliero (intero)
-option_take_control=Prendi controllo (0/1)
-option_full_power=Imposta piena potenza (0/1)
-option_print_text=Stampa (testo)
-option_set_ready=Imposta tempo pronto (-)
-option_set_R=Imposta R (uso interno)
-option_reset_filter_rinse=Azzera timer risciacquo filtro (-)
-option_reset_filter_clean=Azzera timer pulizia filtro (-)
-option_set_power=Imposta alimentazione (0/1)
 
-label_value=Valore :
-label_execute_time=Ora di esecuzione :
-label_repeat_interval=Intervallo ripetizione
-unit_seconds=secondi
-note_interval=(0=una volta, 1h=3600, 1g=86400, 1s=604800)
-label_text=Testo
 
-header_command_queue=Coda comandi
-btn_add_new=Aggiungi
-btn_clear_queue=Svuota coda
-btn_save_to_file=Salva su file
-btn_load_from_file=Carica da file
-btn_set=Imposta
-btn_del=Elimina
 
 footer_last_boot_loading=Ultimo avvio : caricamento…
 
@@ -169,6 +84,7 @@ link_hwtest=Esegui il test
 titolo_hwconfig=Modulo Lay-Z-Spa | Configurazione Hardware
 titolo_hwconfig_header=Configurazione Hardware
 section_hw_title=Hardware :
+section_spa_title=Spa :
 label_select_cio=Selezionate il vostro modello CIO (pompa) :
 option_cio_pre2021=6 fili, pre 2021 (aria)
 option_cio_2021=6 fili, 2021 (aria)
@@ -201,9 +117,6 @@ label_pinout=Piedinatura
 th_cio=CIO
 th_dsp=DSP
 
-label_ambient_sensor=Sensore temperatura "One Wire"
-label_enable=Abilita
-label_sensor_pin=Pin sensore (Dx)
 
 label_power_levels=Livelli di potenza (in Watt)
 label_override=Sovrascrivi
@@ -231,11 +144,7 @@ label_base_topic=Topic base :
 label_telemetry_interval=Intervallo telemetria (s) :
 
 titolo_remove=Rimozione file
-header_remove=Rimozione file
 header_module=modulo lay-z-spa
-menu_remove=Rimozione file
-remove_instruction=Usate questa pagina per rimuovere un file creato sull'ESP8266.
-btn_remove=Rimuovi
 alert_enter_filename=Si prega di inserire un nome file.
 alert_file_removed=Il file è stato rimosso.
 
@@ -264,17 +173,17 @@ titolo_networkconfig=Configurazione Rete
 header_networkconfig=Configurazione Rete
 header_module=modulo lay-z-spa
 
-# Sezione "Punto di accesso"
-section_ap=Punto di accesso :
-label_enableAp=Abilita Punto di accesso dedicato :
-tooltip_enableAp=Spuntato : l'ESP tenterà di connettersi con queste credenziali ; altrimenti, userà le ultime credenziali conosciute.
+# Sezione "Rete WiFi"
+section_ap=Rete WiFi :
+label_enableAp=Connettersi con credenziali WiFi specifiche :
+tooltip_enableAp=Spuntato : l'ESP si connetterà con l'SSID e la password indicati di seguito. Non spuntato : l'ESP riutilizza le ultime credenziali WiFi salvate sul modulo.
 label_ssid=SSID :
 label_password=Password :
 
-# Sezione "Punto di accesso Soft"
-section_softap=Punto di accesso Soft :
-label_enableWM=Abilita Punto di accesso Soft (attenzione : spuntate solo se necessario!) :
-tooltip_enableWM=Attivate il punto di accesso dell'ESP per potervi connettere quando la vostra rete non è disponibile ; se la vostra rete non è disponibile, l'ESP avvierà il proprio punto di accesso.
+# Sezione "Punto di accesso di emergenza"
+section_softap=Punto di accesso di emergenza (SoftAP) :
+label_enableWM=Abilita il punto di accesso di emergenza (consigliato : lascialo spuntato, altrimenti rischi di restare senza accesso al modulo) :
+tooltip_enableWM=Se l'ESP non riesce a connettersi alla rete WiFi sopra, avvia il proprio punto di accesso di emergenza (SoftAP) per permetterti di riconfigurarlo. Questo punto di accesso è attivo solo in caso di mancata connessione, non durante il funzionamento normale.
 
 # Sezione "IP statico"
 section_static_ip=IP statico :
@@ -309,8 +218,15 @@ menu_networkconfig=Configurazione Rete
 tooltip_pcb_v2b_info=Identico alla PCB V2 ma con fili spostati su altri pin per migliore compatibilità con certe pompe
 tooltip_pcb_custom_info=Se usate la vostra scheda – compilate la piedinatura sotto! Lasciate i campi vuoti se non usati.
 tooltip_pinout_info=D0–D8 come etichettato sull'ESP, ma senza la 'D'. L'ESP convertirà in numeri GPIO.
-tooltip_ambient_sensor_info=Richiede un sensore DS18B20 collegato al pin indicato "Pin Sensore". Il sensore aggiornerà la "Temperatura ambiente" periodicamente.
 tooltip_power_levels_info=Personalizza i livelli di potenza per diverse modalità operative.
 
-tooltip_calibrated_info=Se spuntato, la temperatura virtuale è calibrata. Ri-calibrate togliendo la spunta e premendo il pulsante SALVA.
-tooltip_calibrate_instr=Calibrate tenendo la resistenza SPENTA e la pompa ACCESA finché la temperatura non è scesa di alcuni gradi. Non toccate getti, bolle, ecc. nel frattempo. La temperatura dell'acqua deve differire di alcuni gradi da quella ambiente all'inizio.
+
+# ========================
+# Chiavi per debug.html
+# ========================
+label_mqtt_debug=Log di debug via MQTT :
+tooltip_mqtt_debug=Pubblica le righe di log di livello debug sul topic MQTT «<base>/log», in aggiunta a info/errore che vengono sempre inviati.
+label_web_debug=Log di debug in questa pagina :
+tooltip_web_debug=Trasmette le righe di log di livello debug nel log in diretta qui sotto, in aggiunta a info/errore che vengono sempre mostrati.
+section_live_log=Log in diretta :
+btn_clear_log=Cancella

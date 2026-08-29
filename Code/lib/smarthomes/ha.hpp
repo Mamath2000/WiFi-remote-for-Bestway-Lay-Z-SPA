@@ -319,7 +319,7 @@ void setupHA()
     cmp[_dev_cla] = F("connectivity");
     cmp["exp_aft"] = defaultExpire;
 
-    // ON = verbose per-packet CIO/DSP logging on <base>/log (see bwcLog()/mqttLogSink()
+    // ON = verbose per-packet CIO/DSP logging on <base>/log (see bwcLog()/logSink()
     // in main.cpp) - noisy, meant to be toggled on only while actively debugging.
     cmp = createComponent(cmps, "mqtt_debug", "switch", F("MQTT debug logging"), false);
     cmp[_stat_t] = topicLogLevel;
@@ -424,88 +424,6 @@ void setupHA()
     cmp[_mymin] = 0;
     cmp[_mymax] = 8;
     cmp["mode"] = F("slider");
-
-    cmp = createComponent(cmps, "pumptime", "sensor", F("Pump time"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.PUMPTIME|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "pumptime_today", "sensor", F("Pump time today"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.PUMPTIMED|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "heatertime", "sensor", F("Heater time"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.HEATINGTIME|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "heatertime_today", "sensor", F("Heater time today"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.HEATINGTIMED|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "airtime", "sensor", F("Air time"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.AIRTIME|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "airtime_today", "sensor", F("Air time today"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.AIRTIMED|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "jettime", "sensor", F("Jet time"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.JETTIME|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "jettime_today", "sensor", F("Jet time today"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.JETTIMED|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "idletime", "sensor", F("Idle time"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.UPTIME|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "idletime_today", "sensor", F("Idle time today"), false);
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( (value_json.UPTIMED|int)/3600) | round(2) }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock-outline");
-
-    cmp = createComponent(cmps, "time_to_ready", "sensor", F("Time to ready"));
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ value_json.T2R }}");
-    cmp[_unit_of_meas] = F("hours");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("mdi:clock");
-
-    cmp = createComponent(cmps, "readystate", "sensor", F("Ready state"));
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ value_json.RS }}");
-    cmp["exp_aft"] = defaultExpire;
 
     cmp = createComponent(cmps, "ready", "binary_sensor", F("Ready"));
     cmp[_stat_t] = topicMessage;
@@ -630,131 +548,6 @@ void setupHA()
         return;
     }
 
-    initGroup(groupDoc, mychipid + F("_chemistry"), baseName + F(" Traitement"), false);
-    cmps = groupDoc.createNestedObject("cmps");
-
-    cmp = createComponent(cmps, "chlorine_age", "sensor", F("Chlorine age"));
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( ( (now().timestamp()|int) - value_json.CLTIME|int)/3600/24) | round(2) }}");
-    cmp[_unit_of_meas] = F("days");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("hass:hand-coin-outline");
-
-    cmp = createComponent(cmps, "filter_age", "sensor", F("Filter age"));
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( ( (now().timestamp()|int) - value_json.FREP|int)/3600/24) | round(2) }}");
-    cmp[_unit_of_meas] = F("days");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("hass:air-filter");
-
-    cmp = createComponent(cmps, "filter_clean", "sensor", F("Filter clean"));
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( ( (now().timestamp()|int) - value_json.FCLE|int)/3600/24) | round(2) }}");
-    cmp[_unit_of_meas] = F("days");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("hass:spray-bottle");
-
-    cmp = createComponent(cmps, "filter_rinse", "sensor", F("Filter rinse"));
-    cmp[_stat_t] = topicTimes;
-    cmp[_val_tpl] = F("{{ ( ( (now().timestamp()|int) - value_json.FRIN|int)/3600/24) | round(2) }}");
-    cmp[_unit_of_meas] = F("days");
-    cmp["exp_aft"] = defaultExpire;
-    cmp["ic"] = F("hass:water-pump");
-
-    cmp = createComponent(cmps, "reset_chlorine", "button", F("Reset chlorine timer"));
-    cmp[_cmd_t] = topicCommand;
-    cmp["pl_prs"] = F("{CMD:9,VALUE:true,XTIME:0,INTERVAL:0}");
-    cmp["ic"] = F("mdi:restart");
-
-    cmp = createComponent(cmps, "reset_filterchange", "button", F("Reset filter change timer"));
-    cmp[_cmd_t] = topicCommand;
-    cmp["pl_prs"] = F("{CMD:10,VALUE:true,XTIME:0,INTERVAL:0}");
-    cmp["ic"] = F("mdi:restart");
-
-    cmp = createComponent(cmps, "reset_filterclean", "button", F("Reset filter clean timer"));
-    cmp[_cmd_t] = topicCommand;
-    cmp["pl_prs"] = F("{CMD:23,VALUE:true,XTIME:0,INTERVAL:0}");
-    cmp["ic"] = F("mdi:restart");
-
-    cmp = createComponent(cmps, "reset_filterrinse", "button", F("Reset filter rinse timer"));
-    cmp[_cmd_t] = topicCommand;
-    cmp["pl_prs"] = F("{CMD:22,VALUE:true,XTIME:0,INTERVAL:0}");
-    cmp["ic"] = F("mdi:restart");
-
-    cmp = createComponent(cmps, "filter_replace_interval", "number", F("Filter change interval"));
-    cmp[_stat_t] = topicGetConfig;
-    cmp[_cmd_t] = topicSetConfig;
-    cmp[_val_tpl] = F("{{ value_json.FREPI }}");
-    cmp[_cmd_tpl] = F("{FREPI:{{ value | int }}}");
-    cmp[_mymin] = 1;
-    cmp[_mymax] = 1000;
-    cmp["step"] = 1;
-    cmp["mode"] = F("box");
-    cmp[_unit_of_meas] = F("d");
-    cmp[_dev_cla] = F("duration");
-
-    cmp = createComponent(cmps, "filter_clean_interval", "number", F("Filter clean interval"));
-    cmp[_stat_t] = topicGetConfig;
-    cmp[_cmd_t] = topicSetConfig;
-    cmp[_val_tpl] = F("{{ value_json.FCLEI }}");
-    cmp[_cmd_tpl] = F("{FCLEI:{{ value | int }}}");
-    cmp[_mymin] = 1;
-    cmp[_mymax] = 1000;
-    cmp["step"] = 1;
-    cmp["mode"] = F("box");
-    cmp[_unit_of_meas] = F("d");
-    cmp[_dev_cla] = F("duration");
-
-    cmp = createComponent(cmps, "filter_rinse_interval", "number", F("Filter rinse interval"));
-    cmp[_stat_t] = topicGetConfig;
-    cmp[_cmd_t] = topicSetConfig;
-    cmp[_val_tpl] = F("{{ value_json.FRINI }}");
-    cmp[_cmd_tpl] = F("{FRINI:{{ value | int }}}");
-    cmp[_mymin] = 1;
-    cmp[_mymax] = 1000;
-    cmp["step"] = 1;
-    cmp["mode"] = F("box");
-    cmp[_unit_of_meas] = F("d");
-    cmp[_dev_cla] = F("duration");
-
-    cmp = createComponent(cmps, "cl_interval", "number", F("Chlorine interval"));
-    cmp[_stat_t] = topicGetConfig;
-    cmp[_cmd_t] = topicSetConfig;
-    cmp[_val_tpl] = F("{{ value_json.CLINT }}");
-    cmp[_cmd_tpl] = F("{CLINT:{{ value | int }}}");
-    cmp[_mymin] = 1;
-    cmp[_mymax] = 1000;
-    cmp["step"] = 1;
-    cmp["mode"] = F("box");
-    cmp[_unit_of_meas] = F("d");
-    cmp[_dev_cla] = F("duration");
-
-    cmp = createComponent(cmps, "notiftime", "number", F("Notification time"));
-    cmp[_stat_t] = topicGetConfig;
-    cmp[_cmd_t] = topicSetConfig;
-    cmp[_val_tpl] = F("{{ value_json.NOTIFTIME }}");
-    cmp[_cmd_tpl] = F("{NOTIFTIME:{{ value | int }}}");
-    cmp[_mymin] = 1;
-    cmp[_mymax] = 1000;
-    cmp["step"] = 1;
-    cmp["mode"] = F("box");
-    cmp[_unit_of_meas] = F("s");
-    cmp[_dev_cla] = F("duration");
-
-    cmp = createComponent(cmps, "notify", "switch", F("Notify"));
-    cmp[_stat_t] = topicGetConfig;
-    cmp[_cmd_t] = topicSetConfig;
-    cmp[_val_tpl] = F("{{ value_json.NOTIFY }}");
-    cmp["pl_on"] = F("{NOTIFY:true}");
-    cmp["pl_off"] = F("{NOTIFY:false}");
-    cmp["stat_on"] = true;
-    cmp["stat_off"] = false;
-
-    if (!publishGroup(groupDoc, "chemistry"))
-    {
-        return;
-    }
-
     initGroup(groupDoc, mychipid + F("_temperature"), baseName + F(" Temperature"), false);
     cmps = groupDoc.createNestedObject("cmps");
 
@@ -772,20 +565,6 @@ void setupHA()
     cmp[_dev_cla] = F("temperature");
     cmp["exp_aft"] = defaultExpire;
 
-    cmp = createComponent(cmps, "virtual_temp_f", "sensor", F("Virtual temp (F)"));
-    cmp[_stat_t] = topicMessage;
-    cmp[_val_tpl] = F("{{ value_json.VTMF | round(2) }}");
-    cmp[_unit_of_meas] = "\u00b0F";
-    cmp[_dev_cla] = F("temperature");
-    cmp["exp_aft"] = defaultExpire;
-
-    cmp = createComponent(cmps, "virtual_temp_c", "sensor", F("Virtual temp (C)"));
-    cmp[_stat_t] = topicMessage;
-    cmp[_val_tpl] = F("{{ value_json.VTMC | round(2) }}");
-    cmp[_unit_of_meas] = "\u00b0C";
-    cmp[_dev_cla] = F("temperature");
-    cmp["exp_aft"] = defaultExpire;
-
     cmp = createComponent(cmps, "target_temp_f", "sensor", F("Target temp (F)"));
     cmp[_stat_t] = topicMessage;
     cmp[_val_tpl] = F("{{ value_json.TGTF }}");
@@ -797,30 +576,6 @@ void setupHA()
     cmp[_stat_t] = topicMessage;
     cmp[_val_tpl] = F("{{ value_json.TGTC }}");
     cmp[_unit_of_meas] = "\u00b0C";
-    cmp[_dev_cla] = F("temperature");
-    cmp["exp_aft"] = defaultExpire;
-
-    cmp = createComponent(cmps, "amb_temp_c", "number", F("Amb temp C"));
-    cmp[_stat_t] = topicMessage;
-    cmp[_cmd_t] = topicCommand;
-    cmp[_val_tpl] = F("{{ value_json.AMBC }}");
-    cmp[_cmd_tpl] = F("{CMD:15,VALUE:{{ value | int }},XTIME:0,INTERVAL:0}");
-    cmp[_mymin] = -50;
-    cmp[_mymax] = 60;
-    cmp["mode"] = F("slider");
-    cmp[_unit_of_meas] = "\u00b0C";
-    cmp[_dev_cla] = F("temperature");
-    cmp["exp_aft"] = defaultExpire;
-
-    cmp = createComponent(cmps, "amb_temp_f", "number", F("Amb temp F"));
-    cmp[_stat_t] = topicMessage;
-    cmp[_cmd_t] = topicCommand;
-    cmp[_val_tpl] = F("{{ value_json.AMBF }}");
-    cmp[_cmd_tpl] = F("{CMD:14,VALUE:{{ value | int }},XTIME:0,INTERVAL:0}");
-    cmp[_mymin] = -58;
-    cmp[_mymax] = 140;
-    cmp["mode"] = F("slider");
-    cmp[_unit_of_meas] = "\u00b0F";
     cmp[_dev_cla] = F("temperature");
     cmp["exp_aft"] = defaultExpire;
 

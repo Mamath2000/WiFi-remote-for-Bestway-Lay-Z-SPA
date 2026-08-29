@@ -79,7 +79,6 @@ class BWC {
         void saveDebugInfo(const String& s);
         void saveRebootInfo();
         bool getBtnSeqMatch();
-        void setAmbientTemperature(int64_t amb, bool unit);
         String getModel();
         void print(const String& txt);
         void loadCommandQueue();
@@ -90,14 +89,13 @@ class BWC {
     public:
         time_t reboot_time_t;
         String reboot_time_str;
+        String reset_reason_str;
         int pins[8];
-        int tempSensorPin;
         unsigned int loop_count = 0;
         CIO* cio = nullptr;
         DSP* dsp = nullptr;
         bool hasjets, hasgod;
         bool BWC_DEBUG = false;
-        bool hasTempSensor = false;
 
     private:
         bool _loadHardware(Models& cioNo, Models& dspNo, int pins[], std::optional<Power>& power_levels);
@@ -108,12 +106,7 @@ class BWC {
         void _saveCommandQueue();
         void _updateTimes();
         void _saveStates();
-        float _estHeatingTime();
-        void _calcVirtualTemp();
-        void _updateVirtualTempFix_ontempchange();
-        void _updateVirtualTempFix_onheaterchange();
         void _handleStateChanges();
-        void _handleNotification();
         static bool _compare_command(const command_que_item& i1, const command_que_item& i2);
         bool _load_melody_json(const String &filename);
         void _add_melody(const String &filename);
@@ -140,17 +133,11 @@ class BWC {
         double _energy_total_Ws; //Wattseconds internally
         double _energy_cost_total;
         double _energy_cost_daily;
-        unsigned long _temp_change_timestamp_ms, _heatred_change_timestamp_ms;
-        unsigned long _pump_change_timestamp_ms, _bubbles_change_timestamp_ms;
         Ticker _save_settings_ticker;
         Ticker _scroll_text_ticker;
         std::vector<command_que_item> _command_que;
         std::vector<sNote> _notes;
         sStates _prev_cio_states, _prev_dsp_states;
-        uint32_t _cl_timestamp_s;
-        uint32_t _filter_rinse_timestamp_s;
-        uint32_t _filter_clean_timestamp_s;
-        uint32_t _filter_replace_timestamp_s;
         uint32_t _uptime;
         uint32_t _pumptime;
         uint32_t _heatingtime;
@@ -167,23 +154,11 @@ class BWC {
         uint32_t _jettime_daily_ms;
         uint32_t _uptime_daily_ms;
         uint32_t _last_reset_day;
-        uint32_t _filter_rinse_interval;
-        uint32_t _filter_clean_interval;
-        uint32_t _filter_replace_interval;
-        uint32_t _cl_interval;
-        uint32_t _virtual_temp_fix_age;
         int _note_duration;
-        int _notification_time, _next_notification_time;
         int _energy_power_W;
         int _ticker_count;
         int _btn_sequence[4] = {NOBTN,NOBTN,NOBTN,NOBTN}; //keep track of the four latest button presses
-        int _ambient_temp; //always in C internally
-        int _deltatemp;
         double _price;
-        float _R_COOLING = 40;
-        float _heating_degperhour = 1.5; //always in C internally
-        float _virtual_temp; //=virtualtempfix+calculated diff, always in C internally
-        float _virtual_temp_fix; //last fixed data point to add or subtract temp from, always in C internally
         Buttons _prevbutton = NOBTN;
         int16_t _override_dsp_brt_timer;
         uint8_t _dsp_brightness;
@@ -196,8 +171,6 @@ class BWC {
         bool _save_states_needed = false;
         bool _new_data_available = false;
         bool _dsp_tgt_used = true;
-        bool _notify;
-        bool _vt_calibrated = false;
         bool _states_are_restored = false;
 };
 
