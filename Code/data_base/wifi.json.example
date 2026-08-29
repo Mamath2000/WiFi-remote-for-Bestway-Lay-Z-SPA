@@ -1,0 +1,13 @@
+{
+  "enableAp": true,
+  "enableWM": true,
+  "apSsid": "YOUR_WIFI_SSID",
+  "apPwd": "YOUR_WIFI_PASSWORD",
+  "enableStaticIp4": false,
+  "ip4Address": "192.168.1.50",
+  "ip4Gateway": "192.168.1.1",
+  "ip4Subnet": "255.255.255.0",
+  "ip4DnsPrimary": "8.8.8.8",
+  "ip4DnsSecondary": "8.8.4.4",
+  "ip4NTP": ""
+}

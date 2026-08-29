@@ -1,0 +1,10 @@
+{
+  "enableMqtt": true,
+  "mqttHost": "192.168.1.10",
+  "mqttPort": 1883,
+  "mqttUsername": "YOUR_MQTT_USER",
+  "mqttPassword": "YOUR_MQTT_PASSWORD",
+  "mqttClientId": "layzspa",
+  "mqttBaseTopic": "layzspa",
+  "mqttTelemetryInterval": 600
+}

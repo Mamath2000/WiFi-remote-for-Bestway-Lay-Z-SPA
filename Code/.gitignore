@@ -5,3 +5,8 @@
 .vscode/ipch
 data/*.json
 *.pyc
+
+# Real WiFi/MQTT credentials seeded at build time (see *.json.example for the template).
+# hwcfg.json has no secrets and stays tracked.
+data_base/wifi.json
+data_base/mqtt.json

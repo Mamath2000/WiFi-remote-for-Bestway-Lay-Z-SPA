@@ -1131,24 +1131,6 @@ void BWC::getJSONTimes(String &rtn) {
     doc[F("KWH")] = _energy_total_Ws / 3600000.0; //Ws -> kWh
     doc[F("KWHD")] = _energy_daily_Ws / 3600000.0; //Ws -> kWh
     doc[F("WATT")] = _energy_power_W;
-    auto pl = cio->getPowerLevels();
-    int heaterPwr = cio->getHeaterPower();
-    doc[F("WATT_PUMP")] = cio->cio_states.pump    ? pl.PUMPPOWER : 0;
-    doc[F("WATT_HEAT")] = cio->cio_states.heatred ? heaterPwr    : 0;
-    doc[F("WATT_AIR")]  = cio->cio_states.bubbles ? pl.AIRPOWER  : 0;
-    doc[F("WATT_JET")]  = cio->cio_states.jets    ? pl.JETPOWER  : 0;
-    doc[F("WATT_IDLE")] = pl.IDLEPOWER;
-    int heaterPwrNominal = pl.HEATERPOWER_STAGE1 + pl.HEATERPOWER_STAGE2;
-    doc[F("KWH_PUMP")] = (_pumptime    + _pumptime_ms/1000)    * (double)pl.PUMPPOWER     / 3600000.0;
-    doc[F("KWH_HEAT")] = (_heatingtime + _heatingtime_ms/1000) * (double)heaterPwrNominal / 3600000.0;
-    doc[F("KWH_AIR")]  = (_airtime     + _airtime_ms/1000)     * (double)pl.AIRPOWER   / 3600000.0;
-    doc[F("KWH_JET")]  = (_jettime     + _jettime_ms/1000)     * (double)pl.JETPOWER   / 3600000.0;
-    doc[F("KWH_IDLE")] = (_uptime      + _uptime_ms/1000)      * (double)pl.IDLEPOWER  / 3600000.0;
-    doc[F("KWHD_PUMP")] = _pumptime_daily_ms    / 1000.0 * (double)pl.PUMPPOWER     / 3600000.0;
-    doc[F("KWHD_HEAT")] = _heatingtime_daily_ms / 1000.0 * (double)heaterPwrNominal / 3600000.0;
-    doc[F("KWHD_AIR")]  = _airtime_daily_ms     / 1000.0 * (double)pl.AIRPOWER   / 3600000.0;
-    doc[F("KWHD_JET")]  = _jettime_daily_ms     / 1000.0 * (double)pl.JETPOWER   / 3600000.0;
-    doc[F("KWHD_IDLE")] = _uptime_daily_ms      / 1000.0 * (double)pl.IDLEPOWER  / 3600000.0;
     float t2r = _estHeatingTime();
     String t2r_string = F("Not ready");
     if(t2r == -2) t2r_string = F("Ready");
