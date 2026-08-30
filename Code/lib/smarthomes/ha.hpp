@@ -539,7 +539,6 @@ void setupHA()
     cmp[_cmd_tpl] = F("{PRICE:{{ value | float }}}");
     cmp[_mymin] = -1000.0f;
     cmp[_mymax] = 65535.0f;
-    cmp["step"] = 0.0001f;
     cmp["mode"] = F("box");
     cmp[_dev_cla] = F("monetary");
 
